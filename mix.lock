@@ -10,6 +10,7 @@
   "optimal": {:hex, :optimal, "0.3.5", "51a46275226c3e80859ee38e192e4b0058576a1c90cf9c228ee400b9d5dde419", [:mix], [], "hexpm"},
   "parse_trans": {:hex, :parse_trans, "3.2.0", "2adfa4daf80c14dc36f522cf190eb5c4ee3e28008fc6394397c16f62a26258c2", [:rebar3], [], "hexpm"},
   "plug": {:hex, :plug, "1.6.2", "e06a7bd2bb6de5145da0dd950070110dce88045351224bd98e84edfdaaf5ffee", [:mix], [{:cowboy, "~> 1.0.1 or ~> 1.1 or ~> 2.4", [hex: :cowboy, repo: "hexpm", optional: true]}, {:mime, "~> 1.0", [hex: :mime, repo: "hexpm", optional: false]}], "hexpm"},
+  "spandex": {:hex, :spandex, "2.0.0", "f6e2af454b5f2fedb19f2b4b50cea2b13ca8cbe6706acedfdfda74e8332bb2e3", [:mix], [{:optimal, "~> 0.3.3", [hex: :optimal, repo: "hexpm", optional: false]}, {:plug, ">= 1.0.0", [hex: :plug, repo: "hexpm", optional: false]}], "hexpm"},
   "ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.1", "28a4d65b7f59893bc2c7de786dec1e1555bd742d336043fe644ae956c3497fbe", [:make, :rebar], [], "hexpm"},
   "unicode_util_compat": {:hex, :unicode_util_compat, "0.3.1", "a1f612a7b512638634a603c8f401892afbf99b8ce93a45041f8aaca99cadb85e", [:rebar3], [], "hexpm"},
 }

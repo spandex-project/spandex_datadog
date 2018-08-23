@@ -26,7 +26,7 @@ defmodule SpandexDatadog.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:spandex, ">= 2.0"},
+      {:spandex, ">= 2.0.0"},
       {:httpoison, "~> 0.13", only: :test},
       {:msgpax, "~> 1.1"}
     ]
