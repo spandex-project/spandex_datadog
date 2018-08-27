@@ -1,12 +1,22 @@
 defmodule Spandex.Test.Datadog.AdapterTest do
   use ExUnit.Case, async: true
-  alias Spandex.Test.TracedModule
-  alias SpandexDatadog.Test.Util
+
+  alias Spandex.{
+    SpanContext,
+    Test.TracedModule
+  }
+
+  alias SpandexDatadog.{
+    Adapter,
+    Test.Util
+  }
 
   test "a complete trace sends spans" do
     TracedModule.trace_one_thing()
 
-    Enum.each(Util.sent_spans(), fn span ->
+    spans = Util.sent_spans()
+
+    Enum.each(spans, fn span ->
       assert span.service == :spandex_test
       assert span.meta.env == "test"
     end)
@@ -63,5 +73,36 @@ defmodule Spandex.Test.Datadog.AdapterTest do
     assert(Util.find_span("error_one_deep/0", 0).error == 1)
     assert(Util.find_span("do_one_thing/0").error == 0)
     assert(Util.find_span("error_one_deep/0", 1).error == 1)
+  end
+
+  describe "distributed_context/2" do
+    test "returns a SpanContext struct" do
+      conn =
+        :get
+        |> Plug.Test.conn("/")
+        |> Plug.Conn.put_req_header("x-datadog-trace-id", "123")
+        |> Plug.Conn.put_req_header("x-datadog-parent-id", "456")
+        |> Plug.Conn.put_req_header("x-datadog-sampling-priority", "2")
+
+      assert {:ok, %SpanContext{} = span_context} = Adapter.distributed_context(conn, [])
+      assert span_context.trace_id == 123
+      assert span_context.parent_id == 456
+      assert span_context.priority == 2
+    end
+
+    test "priority defaults to 1 (i.e. we currently assume all distributed traces should be kept)" do
+      conn =
+        :get
+        |> Plug.Test.conn("/")
+        |> Plug.Conn.put_req_header("x-datadog-trace-id", "123")
+        |> Plug.Conn.put_req_header("x-datadog-parent-id", "456")
+
+      assert {:ok, %SpanContext{priority: 1}} = Adapter.distributed_context(conn, [])
+    end
+
+    test "returns an error when it cannot detect both a Trace ID and a Span ID" do
+      conn = Plug.Test.conn(:get, "/")
+      assert {:error, :no_distributed_trace} = Adapter.distributed_context(conn, [])
+    end
   end
 end

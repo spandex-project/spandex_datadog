@@ -25,13 +25,13 @@ defmodule SpandexDatadog.Test.Util do
     |> Enum.at(index)
   end
 
-  def sent_spans() do
+  def sent_spans(timeout \\ 500) do
     receive do
       {:sent_datadog_spans, spans} ->
         send(self(), {:sent_datadog_spans, spans})
         spans
     after
-      5000 ->
+      timeout ->
         raise "No spans sent"
     end
   end
