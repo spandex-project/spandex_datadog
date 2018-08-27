@@ -44,8 +44,7 @@ defmodule SpandexDatadog.ApiServer do
                      ],
                      required: [:http],
                      describe: [
-                       verbose?:
-                         "Only to be used for debugging: All finished traces will be logged",
+                       verbose?: "Only to be used for debugging: All finished traces will be logged",
                        host: "The host the agent can be reached at",
                        port: "The port to use when sending traces to the agent",
                        batch_size: "The number of traces that should be sent in a single batch",
@@ -104,8 +103,7 @@ defmodule SpandexDatadog.ApiServer do
   def handle_call(
         {:send_spans, spans},
         _from,
-        %__MODULE__{waiting_traces: waiting_traces, batch_size: batch_size, verbose?: verbose?} =
-          state
+        %__MODULE__{waiting_traces: waiting_traces, batch_size: batch_size, verbose?: verbose?} = state
       )
       when length(waiting_traces) + 1 < batch_size do
     _ =
