@@ -30,19 +30,21 @@ defmodule SpandexDatadog.Adapter do
   """
   @impl Spandex.Adapter
   @spec distributed_context(conn :: Plug.Conn.t(), Keyword.t()) ::
-          {:ok, %{trace_id: binary, parent_id: binary}} | {:error, :no_trace_context}
+          {:ok, %{trace_id: Spandex.id(), parent_id: Spandex.id(), priority: integer()}}
+          | {:error, :no_trace_context}
   def distributed_context(%Plug.Conn{} = conn, _opts) do
     trace_id = get_first_header(conn, "x-datadog-trace-id")
     parent_id = get_first_header(conn, "x-datadog-parent-id")
+    priority = get_first_header(conn, "x-datadog-sampling-priority") || 1
 
     if is_nil(trace_id) || is_nil(parent_id) do
       {:error, :no_distributed_trace}
     else
-      {:ok, %{trace_id: trace_id, parent_id: parent_id}}
+      {:ok, %{trace_id: trace_id, parent_id: parent_id, priority: priority}}
     end
   end
 
-  @spec get_first_header(conn :: Plug.Conn.t(), header_name :: binary) :: binary | nil
+  @spec get_first_header(Plug.Conn.t(), String.t()) :: String.t() | nil
   defp get_first_header(conn, header_name) do
     conn
     |> Plug.Conn.get_req_header(header_name)
