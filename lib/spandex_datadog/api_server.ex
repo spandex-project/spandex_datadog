@@ -4,8 +4,8 @@ defmodule SpandexDatadog.ApiServer do
   """
 
   use GenServer
-
   require Logger
+  alias Spandex.Span
 
   defstruct [
     :asynchronous_send?,
@@ -192,7 +192,7 @@ defmodule SpandexDatadog.ApiServer do
     :ok
   end
 
-  @spec format(Spandex.Span.t()) :: map
+  @spec format(Span.t()) :: map
   def format(span) do
     %{
       trace_id: span.trace_id,
@@ -209,7 +209,7 @@ defmodule SpandexDatadog.ApiServer do
     }
   end
 
-  @spec meta(Spandex.Span.t()) :: map
+  @spec meta(Span.t()) :: map
   defp meta(span) do
     %{}
     |> add_datadog_meta(span)
@@ -221,12 +221,14 @@ defmodule SpandexDatadog.ApiServer do
     |> Enum.into(%{})
   end
 
-  @spec add_datadog_meta(map, Spandex.Span.t()) :: map
-  defp add_datadog_meta(meta, span) do
-    Map.put(meta, :env, span.env)
+  @spec add_datadog_meta(map, Span.t()) :: map
+  defp add_datadog_meta(meta, %Span{env: nil}), do: meta
+
+  defp add_datadog_meta(meta, %Span{env: env}) do
+    Map.put(meta, :env, env)
   end
 
-  @spec add_error_data(map, Spandex.Span.t()) :: map
+  @spec add_error_data(map, Span.t()) :: map
   defp add_error_data(meta, %{error: nil}), do: meta
 
   defp add_error_data(meta, %{error: error}) do
@@ -252,7 +254,7 @@ defmodule SpandexDatadog.ApiServer do
   defp add_error_stacktrace(meta, stacktrace),
     do: Map.put(meta, "error.stack", Exception.format_stacktrace(stacktrace))
 
-  @spec add_http_data(map, Spandex.Span.t()) :: map
+  @spec add_http_data(map, Span.t()) :: map
   defp add_http_data(meta, %{http: nil}), do: meta
 
   defp add_http_data(meta, %{http: http}) do
@@ -267,7 +269,7 @@ defmodule SpandexDatadog.ApiServer do
     |> Map.put("http.method", http[:method])
   end
 
-  @spec add_sql_data(map, Spandex.Span.t()) :: map
+  @spec add_sql_data(map, Span.t()) :: map
   defp add_sql_data(meta, %{sql_query: nil}), do: meta
 
   defp add_sql_data(meta, %{sql_query: sql}) do
@@ -277,7 +279,7 @@ defmodule SpandexDatadog.ApiServer do
     |> Map.put("sql.db", sql[:db])
   end
 
-  @spec add_tags(map, Spandex.Span.t()) :: map
+  @spec add_tags(map, Span.t()) :: map
   defp add_tags(meta, %{tags: nil}), do: meta
 
   defp add_tags(meta, %{tags: tags}) do
