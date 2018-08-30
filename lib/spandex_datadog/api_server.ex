@@ -5,22 +5,30 @@ defmodule SpandexDatadog.ApiServer do
 
   use GenServer
   require Logger
-  alias Spandex.Span
 
-  defstruct [
-    :asynchronous_send?,
-    :http,
-    :url,
-    :host,
-    :port,
-    :verbose?,
-    :waiting_traces,
-    :batch_size,
-    :sync_threshold,
-    :agent_pid
-  ]
+  alias Spandex.{
+    Span,
+    Trace
+  }
 
-  @type t :: %__MODULE__{}
+  defmodule State do
+    @moduledoc false
+
+    @type t :: %State{}
+
+    defstruct [
+      :asynchronous_send?,
+      :http,
+      :url,
+      :host,
+      :port,
+      :verbose?,
+      :waiting_traces,
+      :batch_size,
+      :sync_threshold,
+      :agent_pid
+    ]
+  end
 
   @headers [{"Content-Type", "application/msgpack"}]
 
@@ -44,8 +52,7 @@ defmodule SpandexDatadog.ApiServer do
                      ],
                      required: [:http],
                      describe: [
-                       verbose?:
-                         "Only to be used for debugging: All finished traces will be logged",
+                       verbose?: "Only to be used for debugging: All finished traces will be logged",
                        host: "The host the agent can be reached at",
                        port: "The port to use when sending traces to the agent",
                        batch_size: "The number of traces that should be sent in a single batch",
@@ -72,11 +79,11 @@ defmodule SpandexDatadog.ApiServer do
   @doc """
   Builds server state.
   """
-  @spec init(opts :: Keyword.t()) :: {:ok, t}
+  @spec init(opts :: Keyword.t()) :: {:ok, State.t()}
   def init(opts) do
     {:ok, agent_pid} = Agent.start_link(fn -> 0 end, name: :spandex_currently_send_count)
 
-    state = %__MODULE__{
+    state = %State{
       asynchronous_send?: true,
       host: opts[:host],
       port: opts[:port],
@@ -94,32 +101,39 @@ defmodule SpandexDatadog.ApiServer do
   @doc """
   Send spans asynchronously to DataDog.
   """
-  @spec send_spans(spans :: list(map), Keyword.t()) :: :ok
-  def send_spans(spans, opts \\ []) do
-    GenServer.call(__MODULE__, {:send_spans, spans}, Keyword.get(opts, :timeout, 30_000))
+  @spec send_trace(Trace.t(), Keyword.t()) :: :ok
+  def send_trace(%Trace{} = trace, opts \\ []) do
+    timeout = Keyword.get(opts, :timeout, 30_000)
+    GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
+  end
+
+  @deprecated "Please use send_trace/2 instead"
+  @doc false
+  @spec send_spans([Span.t()], Keyword.t()) :: :ok
+  def send_spans(spans, opts \\ []) when is_list(spans) do
+    timeout = Keyword.get(opts, :timeout, 30_000)
+    trace = %Trace{spans: spans}
+    GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
   end
 
   @doc false
-  @spec handle_call({:send_spans, spans :: list(map)}, term, state :: t) :: {:reply, :ok, t}
   def handle_call(
-        {:send_spans, spans},
+        {:send_trace, trace},
         _from,
-        %__MODULE__{waiting_traces: waiting_traces, batch_size: batch_size, verbose?: verbose?} =
-          state
+        %State{waiting_traces: waiting_traces, batch_size: batch_size, verbose?: verbose?} = state
       )
       when length(waiting_traces) + 1 < batch_size do
-    _ =
-      if verbose? do
-        Logger.info(fn -> "Adding trace to stack with #{Enum.count(spans)} spans" end)
-      end
+    if verbose? do
+      Logger.info(fn -> "Adding trace to stack with #{Enum.count(trace.spans)} spans" end)
+    end
 
-    {:reply, :ok, %{state | waiting_traces: [spans | waiting_traces]}}
+    {:reply, :ok, %{state | waiting_traces: [trace | waiting_traces]}}
   end
 
   def handle_call(
-        {:send_spans, spans},
+        {:send_trace, trace},
         _from,
-        %__MODULE__{
+        %State{
           verbose?: verbose?,
           asynchronous_send?: asynchronous?,
           waiting_traces: waiting_traces,
@@ -127,21 +141,17 @@ defmodule SpandexDatadog.ApiServer do
           agent_pid: agent_pid
         } = state
       ) do
-    all_traces = [spans | waiting_traces]
+    all_traces = [trace | waiting_traces]
 
-    _ =
-      if verbose? do
-        trace_count = Enum.count(all_traces)
+    if verbose? do
+      trace_count = length(all_traces)
 
-        span_count =
-          all_traces
-          |> Enum.map(&Enum.count/1)
-          |> Enum.sum()
+      span_count = Enum.reduce(all_traces, 0, fn trace, acc -> acc + length(trace.spans) end)
 
-        _ = Logger.info(fn -> "Sending #{trace_count} traces, #{span_count} spans." end)
+      Logger.info(fn -> "Sending #{trace_count} traces, #{span_count} spans." end)
 
-        Logger.debug(fn -> "Trace: #{inspect([Enum.concat(all_traces)])}" end)
-      end
+      Logger.debug(fn -> "Trace: #{inspect(all_traces)}" end)
+    end
 
     if asynchronous? do
       below_sync_threshold? =
@@ -174,26 +184,28 @@ defmodule SpandexDatadog.ApiServer do
     {:reply, :ok, %{state | waiting_traces: []}}
   end
 
-  @spec send_and_log(traces :: list(list(map)), any) :: :ok
+  @spec send_and_log([Trace.t()], State.t()) :: :ok
   def send_and_log(traces, %{verbose?: verbose?} = state) do
     response =
       traces
-      |> Enum.map(fn trace ->
-        Enum.map(trace, &format/1)
-      end)
+      |> Enum.map(&format/1)
       |> encode()
       |> push(state)
 
-    _ =
-      if verbose? do
-        Logger.debug(fn -> "Trace response: #{inspect(response)}" end)
-      end
+    if verbose? do
+      Logger.debug(fn -> "Trace response: #{inspect(response)}" end)
+    end
 
     :ok
   end
 
-  @spec format(Span.t()) :: map
-  def format(span) do
+  @spec format(Trace.t()) :: map()
+  def format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
+    Enum.map(spans, fn span -> format(span, priority, baggage) end)
+  end
+
+  @spec format(Span.t(), integer(), Keyword.t()) :: map()
+  def format(%Span{} = span, priority, _baggage) do
     %{
       trace_id: span.trace_id,
       span_id: span.id,
@@ -205,9 +217,18 @@ defmodule SpandexDatadog.ApiServer do
       resource: span.resource,
       service: span.service,
       type: span.type,
-      meta: meta(span)
+      meta: meta(span),
+      metrics: %{
+        _sampling_priority_v1: priority
+      }
     }
   end
+
+  @deprecated "Please use format/3 instead"
+  @spec format(Span.t()) :: map()
+  def format(%Span{} = span), do: format(span, 1, [])
+
+  # Private Helpers
 
   @spec meta(Span.t()) :: map
   defp meta(span) do
@@ -301,8 +322,8 @@ defmodule SpandexDatadog.ApiServer do
   defp encode(data),
     do: data |> deep_remove_nils() |> Msgpax.pack!(data)
 
-  @spec push(body :: iodata, t) :: any
-  defp push(body, %__MODULE__{http: http, host: host, port: port}),
+  @spec push(body :: iodata(), State.t()) :: any()
+  defp push(body, %State{http: http, host: host, port: port}),
     do: http.put("#{host}:#{port}/v0.3/traces", body, @headers)
 
   @spec deep_remove_nils(term) :: term

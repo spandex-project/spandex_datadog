@@ -3,9 +3,8 @@ defmodule Spandex.Test.DatadogTestApiServer do
   Simply sends the data that would have been sent to datadog to self() as a message
   so that the test can assert on payloads that would have been sent to datadog
   """
-  def send_spans(spans) do
-    formatted = Enum.map(spans, &SpandexDatadog.ApiServer.format/1)
-
+  def send_trace(trace, opts \\ []) do
+    formatted = SpandexDatadog.ApiServer.format(trace)
     send(self(), {:sent_datadog_spans, formatted})
   end
 end

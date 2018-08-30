@@ -5,8 +5,8 @@ defmodule SpandexDatadog.MixProject do
     [
       app: :spandex_datadog,
       description: description(),
-      version: "0.1.0",
-      elixir: "~> 1.7",
+      version: "0.2.0",
+      elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -14,7 +14,6 @@ defmodule SpandexDatadog.MixProject do
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:logger]
@@ -22,10 +21,9 @@ defmodule SpandexDatadog.MixProject do
   end
 
   defp package do
-    # These are the default files included in the package
     [
       name: :spandex_datadog,
-      maintainers: ["Zachary Daniel"],
+      maintainers: ["Zachary Daniel", "Greg Mefford"],
       licenses: ["MIT License"],
       links: %{"GitHub" => "https://github.com/spandex-project/spandex_datadog"}
     ]
@@ -37,15 +35,13 @@ defmodule SpandexDatadog.MixProject do
     """
   end
 
-  # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
       {:ex_doc, ">= 0.0.0", only: :dev},
-      {:spandex, ">= 2.0.0"},
+      {:spandex, "~> 2.2"},
       {:httpoison, "~> 0.13", only: :test},
       {:msgpax, "~> 1.1"}
     ]
