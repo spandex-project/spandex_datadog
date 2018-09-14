@@ -121,5 +121,20 @@ defmodule Spandex.Test.Datadog.AdapterTest do
                {"header2", "value2"}
              ]
     end
+
+    test "Merges distributed tracing headers with an existing map of headers" do
+      span_context = %SpanContext{trace_id: 123, parent_id: 456, priority: 10}
+      headers = %{"header1" => "value1", "header2" => "value2"}
+
+      result = Adapter.inject_context(headers, span_context, [])
+
+      assert result == %{
+               "x-datadog-trace-id" => "123",
+               "x-datadog-parent-id" => "456",
+               "x-datadog-sampling-priority" => "10",
+               "header1" => "value1",
+               "header2" => "value2"
+             }
+    end
   end
 end

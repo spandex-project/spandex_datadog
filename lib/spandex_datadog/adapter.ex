@@ -53,12 +53,17 @@ defmodule SpandexDatadog.Adapter do
   """
   @impl Spandex.Adapter
   @spec inject_context([{term(), term()}], SpanContext.t(), Tracer.opts()) :: [{term(), term()}]
-  def inject_context(headers, %SpanContext{trace_id: trace_id, parent_id: parent_id, priority: priority}, _opts) do
-    [
-      {"x-datadog-trace-id", to_string(trace_id)},
-      {"x-datadog-parent-id", to_string(parent_id)},
-      {"x-datadog-sampling-priority", to_string(priority)}
-    ] ++ headers
+  def inject_context(headers, %SpanContext{} = span_context, _opts) when is_list(headers) do
+    span_context
+    |> tracing_headers()
+    |> Kernel.++(headers)
+  end
+
+  def inject_context(headers, %SpanContext{} = span_context, _opts) when is_map(headers) do
+    span_context
+    |> tracing_headers()
+    |> Enum.into(%{})
+    |> Map.merge(headers)
   end
 
   # Private Helpers
@@ -79,4 +84,12 @@ defmodule SpandexDatadog.Adapter do
   end
 
   defp parse_header(_header), do: nil
+
+  defp tracing_headers(%SpanContext{trace_id: trace_id, parent_id: parent_id, priority: priority}) do
+    [
+      {"x-datadog-trace-id", to_string(trace_id)},
+      {"x-datadog-parent-id", to_string(parent_id)},
+      {"x-datadog-sampling-priority", to_string(priority)}
+    ]
+  end
 end
