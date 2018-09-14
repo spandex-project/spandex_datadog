@@ -1,12 +1,16 @@
 defmodule SpandexDatadog.Adapter do
   @moduledoc """
-  A datadog APM implementation for spandex.
+  A Datadog APM implementation for Spandex.
   """
 
   @behaviour Spandex.Adapter
 
   require Logger
-  alias Spandex.SpanContext
+
+  alias Spandex.{
+    SpanContext,
+    Tracer
+  }
 
   @max_id 9_223_372_036_854_775_807
 
@@ -26,11 +30,10 @@ defmodule SpandexDatadog.Adapter do
   end
 
   @doc """
-  Fetches the datadog trace & parent IDs from the conn request headers
-  if they are present.
+  Fetches the Datadog-specific conn request headers if they are present.
   """
   @impl Spandex.Adapter
-  @spec distributed_context(conn :: Plug.Conn.t(), Keyword.t()) ::
+  @spec distributed_context(conn :: Plug.Conn.t(), Tracer.opts()) ::
           {:ok, SpanContext.t()}
           | {:error, :no_distributed_trace}
   def distributed_context(%Plug.Conn{} = conn, _opts) do
@@ -44,6 +47,21 @@ defmodule SpandexDatadog.Adapter do
       {:ok, %SpanContext{trace_id: trace_id, parent_id: parent_id, priority: priority}}
     end
   end
+
+  @doc """
+  Injects Datadog-specific HTTP headers to represent the specified SpanContext
+  """
+  @impl Spandex.Adapter
+  @spec inject_context([{term(), term()}], SpanContext.t(), Tracer.opts()) :: [{term(), term()}]
+  def inject_context(headers, %SpanContext{trace_id: trace_id, parent_id: parent_id, priority: priority}, _opts) do
+    [
+      {"x-datadog-trace-id", to_string(trace_id)},
+      {"x-datadog-parent-id", to_string(parent_id)},
+      {"x-datadog-sampling-priority", to_string(priority)}
+    ] ++ headers
+  end
+
+  # Private Helpers
 
   @spec get_first_header(Plug.Conn.t(), String.t()) :: integer() | nil
   defp get_first_header(conn, header_name) do

@@ -105,4 +105,21 @@ defmodule Spandex.Test.Datadog.AdapterTest do
       assert {:error, :no_distributed_trace} = Adapter.distributed_context(conn, [])
     end
   end
+
+  describe "inject_context/3" do
+    test "Prepends distributed tracing headers to an existing list of headers" do
+      span_context = %SpanContext{trace_id: 123, parent_id: 456, priority: 10}
+      headers = [{"header1", "value1"}, {"header2", "value2"}]
+
+      result = Adapter.inject_context(headers, span_context, [])
+
+      assert result == [
+               {"x-datadog-trace-id", "123"},
+               {"x-datadog-parent-id", "456"},
+               {"x-datadog-sampling-priority", "10"},
+               {"header1", "value1"},
+               {"header2", "value2"}
+             ]
+    end
+  end
 end
