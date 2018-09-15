@@ -5,11 +5,12 @@ defmodule SpandexDatadog.MixProject do
     [
       app: :spandex_datadog,
       description: description(),
-      version: "0.2.0",
+      version: "0.3.0",
       elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
+      docs: docs(),
       package: package()
     ]
   end
@@ -37,6 +38,15 @@ defmodule SpandexDatadog.MixProject do
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
+
+  defp docs do
+    [
+      main: "readme",
+      extras: [
+        "README.md"
+      ]
+    ]
+  end
 
   defp deps do
     [
