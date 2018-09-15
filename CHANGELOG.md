@@ -5,7 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- No unreleased changes currently.
+
+[NEXT]: https://github.com/spandex-project/spandex_datadog/compare/vNEXT...v0.2.0
+
+### Added
+- `SpandexDatadog.Adapter.inject_context/3` added to support the new version of
+  the `Spandex.Adapter` behaviour.
 
 ## [0.2.0]
 

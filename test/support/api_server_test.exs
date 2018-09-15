@@ -29,7 +29,7 @@ defmodule SpandexDatadog.ApiServerTest do
     trace_id = 4_743_028_846_331_200_905
 
     {:ok, span_1} =
-      Spandex.Span.new(
+      Span.new(
         id: 4_743_028_846_331_200_906,
         start: 1_527_752_052_216_478_000,
         service: :foo,
@@ -40,7 +40,7 @@ defmodule SpandexDatadog.ApiServerTest do
       )
 
     {:ok, span_2} =
-      Spandex.Span.new(
+      Span.new(
         id: 4_743_029_846_331_200_906,
         start: 1_527_752_052_216_578_001,
         completion_time: 1_527_752_052_316_578_001,
