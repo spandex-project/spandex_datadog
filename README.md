@@ -10,7 +10,7 @@ dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:spandex_datadog, "~> 0.1.0"}
+    {:spandex_datadog, "~> 0.3.0"}
   ]
 end
 ```
@@ -45,7 +45,7 @@ priority sampling documentation].
 
 [Datadog priority sampling documentation]: https://docs.datadoghq.com/tracing/getting_further/trace_sampling_and_storage/#priority-sampling-for-distributed-tracing
 
-## Api Sender Performance
+## API Sender Performance
 
 Originally, the library had an API server and spans were sent via
 `GenServer.cast`, but we've seen the need to introduce backpressure, and limit

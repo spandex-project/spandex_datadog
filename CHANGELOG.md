@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-[NEXT]: https://github.com/spandex-project/spandex_datadog/compare/vNEXT...v0.2.0
+[NEXT]: https://github.com/spandex-project/spandex_datadog/compare/vNEXT...v0.3.0
+
+## [0.3.0]
+
+[0.3.0]: https://github.com/spandex-project/spandex_datadog/compare/v0.3.0...v0.2.0
 
 ### Added
 - `SpandexDatadog.Adapter.inject_context/3` added to support the new version of
