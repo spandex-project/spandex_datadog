@@ -41,7 +41,7 @@ defmodule SpandexDatadog.MixProject do
   defp deps do
     [
       {:ex_doc, ">= 0.0.0", only: :dev},
-      {:spandex, "~> 2.2"},
+      {:spandex, "~> 2.3"},
       {:httpoison, "~> 0.13", only: :test},
       {:msgpax, "~> 1.1"}
     ]
