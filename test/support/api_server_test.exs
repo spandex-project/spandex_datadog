@@ -162,4 +162,13 @@ defmodule SpandexDatadog.ApiServerTest do
       assert_received {:put_datadog_spans, ^formatted, ^url, _}
     end
   end
+
+  describe "ApiServer.format/3" do
+    test "it fills in Datadog metadata using the trace baggage", %{trace: trace} do
+      span = trace.spans |> Enum.at(0)
+      payload = ApiServer.format(span, 1, user_id: "U53R1D")
+
+      assert get_in(payload, [:meta, :user_id]) == "U53R1D"
+    end
+  end
 end
