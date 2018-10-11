@@ -219,7 +219,7 @@ defmodule SpandexDatadog.ApiServer do
       duration: (span.completion_time || SpandexDatadog.Adapter.now()) - span.start,
       parent_id: span.parent_id,
       error: error(span.error),
-      resource: span.resource,
+      resource: span.resource || span.name,
       service: span.service,
       type: span.type,
       meta: meta(span),
