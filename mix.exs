@@ -1,11 +1,13 @@
 defmodule SpandexDatadog.MixProject do
   use Mix.Project
 
+  @version "0.3.1"
+
   def project do
     [
       app: :spandex_datadog,
       description: description(),
-      version: "0.3.0",
+      version: @version,
       elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -57,6 +59,7 @@ defmodule SpandexDatadog.MixProject do
     [
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:excoveralls, "~> 0.10", only: :test},
+      {:git_ops, "~> 0.3.4", only: [:dev]},
       {:inch_ex, github: "rrrene/inch_ex", only: [:dev, :test]},
       {:spandex, "~> 2.3"},
       {:httpoison, "~> 0.13", only: :test},
