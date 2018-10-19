@@ -51,6 +51,8 @@ defmodule SpandexDatadog.MixProject do
   defp deps do
     [
       {:ex_doc, ">= 0.0.0", only: :dev},
+      {:excoveralls, "~> 0.10", only: :test},
+      {:inch_ex, github: "rrrene/inch_ex", only: [:dev, :test]},
       {:spandex, "~> 2.3"},
       {:httpoison, "~> 0.13", only: :test},
       {:msgpax, "~> 1.1"}
