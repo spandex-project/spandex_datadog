@@ -11,7 +11,12 @@ defmodule SpandexDatadog.MixProject do
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       docs: docs(),
-      package: package()
+      package: package(),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        "coveralls.circle": :test,
+        coveralls: :test
+      ]
     ]
   end
 
