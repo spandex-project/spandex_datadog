@@ -71,9 +71,10 @@ backpressure.
 
 A simple way to think about it is that if you are seeing 1000
 request per second and `batch_size` is 10, then you'll be making 100
-requests per second to Datadog (probably a bad config). With
-`sync_threshold` set to 10, only 10 of those requests can be processed concurrently before the work is done synchronously 
-(not waiting for the asynchronous ones to complete even). 
+requests per second to Datadog (probably a bad config). 
+With `sync_threshold` set to 10, only 10 of those requests can be 
+processed concurrently before trace calls become synchronous. 
+
 This concept of backpressure is very important, and strategies
 for switching to synchronous operation are often surprisingly far more
 performant than purely asynchronous strategies (and much more predictable).
