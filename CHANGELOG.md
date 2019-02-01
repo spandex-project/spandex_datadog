@@ -5,6 +5,15 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [0.4.0](https://github.com/spandex-project/spandex_datadog/compare/0.3.1...0.4.0) (2019-2-1)
+
+
+
+
+### Features:
+
+* support elixir 1.8 via msgpax bump
+
 ## [0.3.1](https://github.com/spandex-project/spandex_datadog/compare/0.3.1...0.3.1) (2018-10-19)
 
 Initial release using automated changelog management
