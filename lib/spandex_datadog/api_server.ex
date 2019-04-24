@@ -305,7 +305,12 @@ defmodule SpandexDatadog.ApiServer do
   defp add_tags(meta, %{tags: nil}), do: meta
 
   defp add_tags(meta, %{tags: tags}) do
-    Map.merge(meta, Enum.into(tags, %{}))
+    Map.merge(
+      meta,
+      tags
+      |> Enum.map(fn {k, v} -> {k, term_to_string(v)} end)
+      |> Enum.into(%{})
+    )
   end
 
   @spec error(nil | Keyword.t()) :: integer
@@ -346,4 +351,14 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   defp deep_remove_nils(term), do: term
+
+  defp term_to_string(term) do
+    case String.Chars.impl_for(term) do
+      nil ->
+        inspect(term)
+
+      _to_string_implementation ->
+        to_string(term)
+    end
+  end
 end
