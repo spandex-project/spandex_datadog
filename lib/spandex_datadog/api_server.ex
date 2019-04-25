@@ -352,13 +352,7 @@ defmodule SpandexDatadog.ApiServer do
 
   defp deep_remove_nils(term), do: term
 
-  defp term_to_string(term) do
-    case String.Chars.impl_for(term) do
-      nil ->
-        inspect(term)
-
-      _to_string_implementation ->
-        to_string(term)
-    end
-  end
+  defp term_to_string(term) when is_binary(term), do: term
+  defp term_to_string(term) when is_atom(term), do: term
+  defp term_to_string(term), do: inspect(term)
 end

@@ -37,7 +37,7 @@ defmodule SpandexDatadog.ApiServerTest do
         name: "foo",
         trace_id: trace_id,
         completion_time: 1_527_752_052_216_578_000,
-        tags: [foo: "123", bar: 321, baz: {1, 2}]
+        tags: [foo: "123", bar: 321, baz: {1, 2}, zyx: [xyz: {1, 2}]]
       )
 
     {:ok, span_2} =
@@ -85,7 +85,13 @@ defmodule SpandexDatadog.ApiServerTest do
         %{
           "duration" => 100_000,
           "error" => 0,
-          "meta" => %{"env" => "local", "foo" => "123", "bar" => "321", "baz" => "{1, 2}"},
+          "meta" => %{
+            "env" => "local",
+            "foo" => "123",
+            "bar" => "321",
+            "baz" => "{1, 2}",
+            "zyx" => "[xyz: {1, 2}]"
+          },
           "name" => "foo",
           "service" => "foo",
           "resource" => "foo",
@@ -136,7 +142,13 @@ defmodule SpandexDatadog.ApiServerTest do
         %{
           "duration" => 100_000,
           "error" => 0,
-          "meta" => %{"env" => "local", "foo" => "123", "bar" => "321", "baz" => "{1, 2}"},
+          "meta" => %{
+            "env" => "local",
+            "foo" => "123",
+            "bar" => "321",
+            "baz" => "{1, 2}",
+            "zyx" => "[xyz: {1, 2}]"
+          },
           "name" => "foo",
           "service" => "foo",
           "resource" => "foo",
