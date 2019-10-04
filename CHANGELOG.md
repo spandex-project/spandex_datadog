@@ -5,6 +5,15 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [0.4.1](https://github.com/spandex-project/spandex_datadog/compare/0.4.0...0.4.1) (2019-10-4)
+
+
+
+
+### Bug Fixes:
+
+* Ensure tags are converted to strings (#16)
+
 ## [0.4.0](https://github.com/spandex-project/spandex_datadog/compare/0.3.1...0.4.0) (2019-2-1)
 
 
