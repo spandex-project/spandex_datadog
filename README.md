@@ -4,7 +4,7 @@
 [![Inline docs](http://inch-ci.org/github/spandex-project/spandex_datadog.svg)](http://inch-ci.org/github/spandex-project/spandex_datadog)
 [![Coverage Status](https://coveralls.io/repos/github/spandex-project/spandex_datadog/badge.svg)](https://coveralls.io/github/spandex-project/spandex_datadog)
 [![Hex pm](http://img.shields.io/hexpm/v/spandex_datadog.svg?style=flat)](https://hex.pm/packages/spandex_datadog)
-[![Ebert](https://ebertapp.io/github/spandex-project/spandex_datadog.svg)](https://ebertapp.io/github/spandex-project/spandex_datadog)
+[![SourceLevel](https://sourcelevel.io/github/spandex-project/spandex_datadog.svg)](https://sourcelevel.io/github/spandex-project/spandex_datadog)
 
 A datadog adapter for the `spandex` library.
 
@@ -62,7 +62,7 @@ Batch size refers to *traces*, not spans, so if you send a large amount of spans
 per trace, then you probably want to keep that number low. If you send only a
 few spans, then you could set it significantly higher.
 
-Sync threshold is how many _simultaneous_ HTTP pushes will be going to Datadog 
+Sync threshold is how many _simultaneous_ HTTP pushes will be going to Datadog
 before it blocks/throttles your application by making the tracing call synchronous instead of async.
 
 Ideally, the sync threshold would be set to a point that you wouldn't reasonably reach often, but
@@ -71,9 +71,9 @@ backpressure.
 
 A simple way to think about it is that if you are seeing 1000
 request per second and `batch_size` is 10, then you'll be making 100
-requests per second to Datadog (probably a bad config). 
-With `sync_threshold` set to 10, only 10 of those requests can be 
-processed concurrently before trace calls become synchronous. 
+requests per second to Datadog (probably a bad config).
+With `sync_threshold` set to 10, only 10 of those requests can be
+processed concurrently before trace calls become synchronous.
 
 This concept of backpressure is very important, and strategies
 for switching to synchronous operation are often surprisingly far more
