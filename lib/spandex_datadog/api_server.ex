@@ -215,7 +215,7 @@ defmodule SpandexDatadog.ApiServer do
   def format(%Span{} = span), do: format(span, 1, [])
 
   @spec format(Span.t(), integer(), Keyword.t()) :: map()
-  def format(%Span{} = span, priority, _baggage) do
+  def format(%Span{} = span, priority, baggage) do
     %{
       trace_id: span.trace_id,
       span_id: span.id,
@@ -227,7 +227,7 @@ defmodule SpandexDatadog.ApiServer do
       resource: span.resource || span.name,
       service: span.service,
       type: span.type,
-      meta: meta(span),
+      meta: meta(span, baggage),
       metrics: %{
         _sampling_priority_v1: priority
       }
@@ -236,14 +236,15 @@ defmodule SpandexDatadog.ApiServer do
 
   # Private Helpers
 
-  @spec meta(Span.t()) :: map
-  defp meta(span) do
+  @spec meta(Span.t(), Keyword.t()) :: map
+  defp meta(span, baggage) do
     %{}
     |> add_datadog_meta(span)
     |> add_error_data(span)
     |> add_http_data(span)
     |> add_sql_data(span)
     |> add_tags(span)
+    |> add_baggage(baggage)
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Enum.into(%{})
   end
@@ -316,6 +317,11 @@ defmodule SpandexDatadog.ApiServer do
       |> Enum.map(fn {k, v} -> {k, term_to_string(v)} end)
       |> Enum.into(%{})
     )
+  end
+
+  @spec add_baggage(map, Keyword.t()) :: map
+  defp add_baggage(meta, baggage) do
+    Enum.into(baggage, meta)
   end
 
   @spec error(nil | Keyword.t()) :: integer
