@@ -5,6 +5,15 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [0.5.0](https://github.com/spandex-project/spandex_datadog/compare/0.4.1...0.5.0) (2019-11-25)
+
+
+
+
+### Features:
+
+* Add X-Datadog-Trace-Count header (#22)
+
 ## [0.4.1](https://github.com/spandex-project/spandex_datadog/compare/0.4.0...0.4.1) (2019-10-4)
 
 

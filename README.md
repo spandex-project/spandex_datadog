@@ -16,7 +16,7 @@ dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:spandex_datadog, "~> 0.4.1"}
+    {:spandex_datadog, "~> 0.5.0"}
   ]
 end
 ```
