@@ -119,7 +119,12 @@ defmodule SpandexDatadog.ApiServerTest do
         }
       ]
 
-      assert_received {:put_datadog_spans, ^formatted, ^url, _}
+      headers = [
+        {"Content-Type", "application/msgpack"},
+        {"X-Datadog-Trace-Count", 1}
+      ]
+
+      assert_received {:put_datadog_spans, ^formatted, ^url, ^headers}
     end
 
     test "doesn't care about the response result", %{trace: trace, state: state, url: url} do

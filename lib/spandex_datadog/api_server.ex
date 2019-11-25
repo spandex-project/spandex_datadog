@@ -30,6 +30,9 @@ defmodule SpandexDatadog.ApiServer do
     ]
   end
 
+  # Same as HTTPoison.headers
+  @type headers :: [{atom, binary}] | [{binary, binary}] | %{binary => binary} | any
+
   @headers [{"Content-Type", "application/msgpack"}]
 
   @start_link_opts Optimal.schema(
@@ -186,11 +189,13 @@ defmodule SpandexDatadog.ApiServer do
 
   @spec send_and_log([Trace.t()], State.t()) :: :ok
   def send_and_log(traces, %{verbose?: verbose?} = state) do
+    headers = @headers ++ [{"X-Datadog-Trace-Count", length(traces)}]
+
     response =
       traces
       |> Enum.map(&format/1)
       |> encode()
-      |> push(state)
+      |> push(headers, state)
 
     if verbose? do
       Logger.debug(fn -> "Trace response: #{inspect(response)}" end)
@@ -328,9 +333,9 @@ defmodule SpandexDatadog.ApiServer do
   defp encode(data),
     do: data |> deep_remove_nils() |> Msgpax.pack!(data)
 
-  @spec push(body :: iodata(), State.t()) :: any()
-  defp push(body, %State{http: http, host: host, port: port}),
-    do: http.put("#{host}:#{port}/v0.3/traces", body, @headers)
+  @spec push(body :: iodata(), headers, State.t()) :: any()
+  defp push(body, headers, %State{http: http, host: host, port: port}),
+    do: http.put("#{host}:#{port}/v0.3/traces", body, headers)
 
   @spec deep_remove_nils(term) :: term
   defp deep_remove_nils(term) when is_map(term) do
