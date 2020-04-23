@@ -228,9 +228,10 @@ defmodule SpandexDatadog.ApiServer do
       service: span.service,
       type: span.type,
       meta: meta(span),
-      metrics: %{
-        _sampling_priority_v1: priority
-      }
+      metrics:
+        metrics(span, %{
+          _sampling_priority_v1: priority
+        })
     }
   end
 
@@ -310,12 +311,38 @@ defmodule SpandexDatadog.ApiServer do
   defp add_tags(meta, %{tags: nil}), do: meta
 
   defp add_tags(meta, %{tags: tags}) do
+    tags = tags |> Keyword.delete(:analytics_event)
+
     Map.merge(
       meta,
       tags
       |> Enum.map(fn {k, v} -> {k, term_to_string(v)} end)
       |> Enum.into(%{})
     )
+  end
+
+  @spec metrics(Span.t(), map) :: map
+  defp metrics(span, initial_value = %{}) do
+    initial_value
+    |> add_metrics(span)
+    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+    |> Enum.into(%{})
+  end
+
+  @spec add_metrics(map, Span.t()) :: map
+  defp add_metrics(metrics, %{tags: nil}), do: metrics
+
+  defp add_metrics(metrics, %{tags: tags}) do
+    with analytics_event <- tags |> Keyword.get(:analytics_event),
+         true <- analytics_event != nil do
+      Map.merge(
+        metrics,
+        %{"_dd1.sr.eausr" => 1}
+      )
+    else
+      _ ->
+        metrics
+    end
   end
 
   @spec error(nil | Keyword.t()) :: integer

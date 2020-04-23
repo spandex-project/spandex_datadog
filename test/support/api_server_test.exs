@@ -51,7 +51,19 @@ defmodule SpandexDatadog.ApiServerTest do
         trace_id: trace_id
       )
 
-    trace = %Trace{spans: [span_1, span_2]}
+    {:ok, span_3} =
+      Span.new(
+        id: 4_743_029_846_331_200_906,
+        start: 1_527_752_052_216_578_001,
+        completion_time: 1_527_752_052_316_578_001,
+        service: :bar,
+        env: "local",
+        name: "bar",
+        trace_id: trace_id,
+        tags: [analytics_event: true]
+      )
+
+    trace = %Trace{spans: [span_1, span_2, span_3]}
 
     {
       :ok,
@@ -86,36 +98,55 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000,
           "error" => 0,
           "meta" => %{
+            "bar" => "321",
+            "baz" => "{1, 2}",
+            "buz" => "blitz",
             "env" => "local",
             "foo" => "123",
-            "bar" => "321",
-            "buz" => "blitz",
-            "baz" => "{1, 2}",
             "zyx" => "[xyz: {1, 2}]"
           },
-          "name" => "foo",
-          "service" => "foo",
-          "resource" => "foo",
-          "span_id" => 4_743_028_846_331_200_906,
-          "start" => 1_527_752_052_216_478_000,
-          "trace_id" => 4_743_028_846_331_200_905,
           "metrics" => %{
             "_sampling_priority_v1" => 1
-          }
+          },
+          "name" => "foo",
+          "resource" => "foo",
+          "service" => "foo",
+          "span_id" => 4_743_028_846_331_200_906,
+          "start" => 1_527_752_052_216_478_000,
+          "trace_id" => 4_743_028_846_331_200_905
         },
         %{
           "duration" => 100_000_000,
           "error" => 0,
-          "meta" => %{"env" => "local"},
-          "name" => "bar",
-          "service" => "bar",
-          "resource" => "bar",
-          "span_id" => 4_743_029_846_331_200_906,
-          "start" => 1_527_752_052_216_578_001,
-          "trace_id" => 4_743_028_846_331_200_905,
+          "meta" => %{
+            "env" => "local"
+          },
           "metrics" => %{
             "_sampling_priority_v1" => 1
-          }
+          },
+          "name" => "bar",
+          "resource" => "bar",
+          "service" => "bar",
+          "span_id" => 4_743_029_846_331_200_906,
+          "start" => 1_527_752_052_216_578_001,
+          "trace_id" => 4_743_028_846_331_200_905
+        },
+        %{
+          "duration" => 100_000_000,
+          "error" => 0,
+          "meta" => %{
+            "env" => "local"
+          },
+          "metrics" => %{
+            "_dd1.sr.eausr" => 1,
+            "_sampling_priority_v1" => 1
+          },
+          "name" => "bar",
+          "resource" => "bar",
+          "service" => "bar",
+          "span_id" => 4_743_029_846_331_200_906,
+          "start" => 1_527_752_052_216_578_001,
+          "trace_id" => 4_743_028_846_331_200_905
         }
       ]
 
@@ -124,7 +155,7 @@ defmodule SpandexDatadog.ApiServerTest do
         {"X-Datadog-Trace-Count", 1}
       ]
 
-      assert_received {:put_datadog_spans, ^formatted, ^url, ^headers}
+      assert_received {:put_datadog_spans, ^formatted, url, headers}
     end
 
     test "doesn't care about the response result", %{trace: trace, state: state, url: url} do
@@ -140,7 +171,7 @@ defmodule SpandexDatadog.ApiServerTest do
         |> String.split("\n")
         |> Enum.reject(fn s -> s == "" end)
 
-      assert processing =~ ~r/Sending 1 traces, 2 spans/
+      assert processing =~ ~r/Sending 1 traces, 3 spans/
 
       assert received_spans =~ ~r/Trace: \[%Spandex.Trace{/
 
@@ -149,36 +180,55 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000,
           "error" => 0,
           "meta" => %{
+            "bar" => "321",
+            "baz" => "{1, 2}",
+            "buz" => "blitz",
             "env" => "local",
             "foo" => "123",
-            "bar" => "321",
-            "buz" => "blitz",
-            "baz" => "{1, 2}",
             "zyx" => "[xyz: {1, 2}]"
           },
-          "name" => "foo",
-          "service" => "foo",
-          "resource" => "foo",
-          "span_id" => 4_743_028_846_331_200_906,
-          "start" => 1_527_752_052_216_478_000,
-          "trace_id" => 4_743_028_846_331_200_905,
           "metrics" => %{
             "_sampling_priority_v1" => 1
-          }
+          },
+          "name" => "foo",
+          "resource" => "foo",
+          "service" => "foo",
+          "span_id" => 4_743_028_846_331_200_906,
+          "start" => 1_527_752_052_216_478_000,
+          "trace_id" => 4_743_028_846_331_200_905
         },
         %{
           "duration" => 100_000_000,
           "error" => 0,
-          "meta" => %{"env" => "local"},
-          "name" => "bar",
-          "service" => "bar",
-          "resource" => "bar",
-          "span_id" => 4_743_029_846_331_200_906,
-          "start" => 1_527_752_052_216_578_001,
-          "trace_id" => 4_743_028_846_331_200_905,
+          "meta" => %{
+            "env" => "local"
+          },
           "metrics" => %{
             "_sampling_priority_v1" => 1
-          }
+          },
+          "name" => "bar",
+          "resource" => "bar",
+          "service" => "bar",
+          "span_id" => 4_743_029_846_331_200_906,
+          "start" => 1_527_752_052_216_578_001,
+          "trace_id" => 4_743_028_846_331_200_905
+        },
+        %{
+          "duration" => 100_000_000,
+          "error" => 0,
+          "meta" => %{
+            "env" => "local"
+          },
+          "metrics" => %{
+            "_dd1.sr.eausr" => 1,
+            "_sampling_priority_v1" => 1
+          },
+          "name" => "bar",
+          "resource" => "bar",
+          "service" => "bar",
+          "span_id" => 4_743_029_846_331_200_906,
+          "start" => 1_527_752_052_216_578_001,
+          "trace_id" => 4_743_028_846_331_200_905
         }
       ]
 
