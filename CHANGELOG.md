@@ -5,6 +5,15 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [0.6.0](https://github.com/spandex-project/spandex_datadog/compare/0.5.0...0.6.0) (2020-4-23)
+
+
+
+
+### Features:
+
+* add support for app analytics (#23)
+
 ## [0.5.0](https://github.com/spandex-project/spandex_datadog/compare/0.4.1...0.5.0) (2019-11-25)
 
 
