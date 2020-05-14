@@ -61,7 +61,7 @@ defmodule SpandexDatadog.MixProject do
       {:excoveralls, "~> 0.10", only: :test},
       {:git_ops, "~> 0.3.4", only: [:dev]},
       {:inch_ex, github: "rrrene/inch_ex", only: [:dev, :test]},
-      {:spandex, "~> 2.3"},
+      {:spandex, "~> 3.0"},
       {:httpoison, "~> 0.13", only: :test},
       {:msgpax, "~> 2.2.1"}
     ]
