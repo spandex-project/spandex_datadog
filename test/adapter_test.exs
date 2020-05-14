@@ -1,13 +1,11 @@
-defmodule Spandex.Test.Datadog.AdapterTest do
+defmodule SpandexDatadog.Test.AdapterTest do
   use ExUnit.Case, async: true
 
-  alias Spandex.{
-    SpanContext,
-    Test.TracedModule
-  }
+  alias Spandex.SpanContext
 
   alias SpandexDatadog.{
     Adapter,
+    Test.TracedModule,
     Test.Util
   }
 
