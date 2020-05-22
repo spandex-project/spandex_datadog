@@ -1,13 +1,11 @@
-defmodule Spandex.Test.Datadog.AdapterTest do
+defmodule SpandexDatadog.Test.AdapterTest do
   use ExUnit.Case, async: true
 
-  alias Spandex.{
-    SpanContext,
-    Test.TracedModule
-  }
+  alias Spandex.SpanContext
 
   alias SpandexDatadog.{
     Adapter,
+    Test.TracedModule,
     Test.Util
   }
 
@@ -75,7 +73,7 @@ defmodule Spandex.Test.Datadog.AdapterTest do
     assert(Util.find_span("error_one_deep/0", 1).error == 1)
   end
 
-  describe "distributed_context/2" do
+  describe "distributed_context/2 with Plug.Conn" do
     test "returns a SpanContext struct" do
       conn =
         :get
@@ -103,6 +101,44 @@ defmodule Spandex.Test.Datadog.AdapterTest do
     test "returns an error when it cannot detect both a Trace ID and a Span ID" do
       conn = Plug.Test.conn(:get, "/")
       assert {:error, :no_distributed_trace} = Adapter.distributed_context(conn, [])
+    end
+  end
+
+  describe "distributed_context/2 with Spandex.headers()" do
+    test "returns a SpanContext struct when headers is a list" do
+      headers = [{"x-datadog-trace-id", "123"}, {"x-datadog-parent-id", "456"}, {"x-datadog-sampling-priority", "2"}]
+
+      assert {:ok, %SpanContext{} = span_context} = Adapter.distributed_context(headers, [])
+      assert span_context.trace_id == 123
+      assert span_context.parent_id == 456
+      assert span_context.priority == 2
+    end
+
+    test "returns a SpanContext struct when headers is a map" do
+      headers = %{
+        "x-datadog-trace-id" => "123",
+        "x-datadog-parent-id" => "456",
+        "x-datadog-sampling-priority" => "2"
+      }
+
+      assert {:ok, %SpanContext{} = span_context} = Adapter.distributed_context(headers, [])
+      assert span_context.trace_id == 123
+      assert span_context.parent_id == 456
+      assert span_context.priority == 2
+    end
+
+    test "priority defaults to 1 (i.e. we currently assume all distributed traces should be kept)" do
+      headers = %{
+        "x-datadog-trace-id" => "123",
+        "x-datadog-parent-id" => "456"
+      }
+
+      assert {:ok, %SpanContext{priority: 1}} = Adapter.distributed_context(headers, [])
+    end
+
+    test "returns an error when it cannot detect both a Trace ID and a Span ID" do
+      headers = %{}
+      assert {:error, :no_distributed_trace} = Adapter.distributed_context(headers, [])
     end
   end
 

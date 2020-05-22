@@ -155,7 +155,7 @@ defmodule SpandexDatadog.ApiServerTest do
         {"X-Datadog-Trace-Count", 1}
       ]
 
-      assert_received {:put_datadog_spans, ^formatted, url, headers}
+      assert_received {:put_datadog_spans, ^formatted, ^url, ^headers}
     end
 
     test "doesn't care about the response result", %{trace: trace, state: state, url: url} do

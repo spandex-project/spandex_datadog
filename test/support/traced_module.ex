@@ -1,9 +1,9 @@
-defmodule Spandex.Test.TracedModule do
+defmodule SpandexDatadog.Test.TracedModule do
   @moduledoc false
   require Spandex
 
-  require Spandex.Test.Support.Tracer
-  alias Spandex.Test.Support.Tracer
+  require SpandexDatadog.Test.Support.Tracer
+  alias SpandexDatadog.Test.Support.Tracer
 
   defmodule TestError do
     defexception [:message]
