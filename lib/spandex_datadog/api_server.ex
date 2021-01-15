@@ -106,8 +106,11 @@ defmodule SpandexDatadog.ApiServer do
   """
   @spec send_trace(Trace.t(), Keyword.t()) :: :ok
   def send_trace(%Trace{} = trace, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, 30_000)
-    GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
+    :telemetry.span([:spandex_datadog, :send_trace], %{trace: trace}, fn ->
+      timeout = Keyword.get(opts, :timeout, 30_000)
+      result = GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
+      {result, %{result: result}}
+    end)
   end
 
   @deprecated "Please use send_trace/2 instead"
@@ -144,47 +147,51 @@ defmodule SpandexDatadog.ApiServer do
           agent_pid: agent_pid
         } = state
       ) do
-    all_traces = [trace | waiting_traces]
+    :telemetry.span([:spandex_datadog, :handle_call, :send_trace], %{trace: trace, state: state}, fn ->
+      all_traces = [trace | waiting_traces]
 
-    if verbose? do
-      trace_count = length(all_traces)
+      if verbose? do
+        trace_count = length(all_traces)
 
-      span_count = Enum.reduce(all_traces, 0, fn trace, acc -> acc + length(trace.spans) end)
+        span_count = Enum.reduce(all_traces, 0, fn trace, acc -> acc + length(trace.spans) end)
 
-      Logger.info(fn -> "Sending #{trace_count} traces, #{span_count} spans." end)
+        Logger.info(fn -> "Sending #{trace_count} traces, #{span_count} spans." end)
 
-      Logger.debug(fn -> "Trace: #{inspect(all_traces)}" end)
-    end
-
-    if asynchronous? do
-      below_sync_threshold? =
-        Agent.get_and_update(agent_pid, fn count ->
-          if count < sync_threshold do
-            {true, count + 1}
-          else
-            {false, count}
-          end
-        end)
-
-      if below_sync_threshold? do
-        Task.start(fn ->
-          try do
-            send_and_log(all_traces, state)
-          after
-            Agent.update(agent_pid, fn count -> count - 1 end)
-          end
-        end)
-      else
-        # We get benefits from running in a separate process (like better GC)
-        # So we async/await here to mimic the behavour above but still apply backpressure
-        task = Task.async(fn -> send_and_log(all_traces, state) end)
-        Task.await(task)
+        Logger.debug(fn -> "Trace: #{inspect(all_traces)}" end)
       end
-    else
-      send_and_log(all_traces, state)
-    end
 
-    {:reply, :ok, %{state | waiting_traces: []}}
+      if asynchronous? do
+        below_sync_threshold? =
+          Agent.get_and_update(agent_pid, fn count ->
+            if count < sync_threshold do
+              {true, count + 1}
+            else
+              {false, count}
+            end
+          end)
+
+        if below_sync_threshold? do
+          Task.start(fn ->
+            try do
+              send_and_log(all_traces, state)
+            after
+              Agent.update(agent_pid, fn count -> count - 1 end)
+            end
+          end)
+        else
+          # We get benefits from running in a separate process (like better GC)
+          # So we async/await here to mimic the behavour above but still apply backpressure
+          task = Task.async(fn -> send_and_log(all_traces, state) end)
+          Task.await(task)
+        end
+      else
+        send_and_log(all_traces, state)
+      end
+
+      state = %{state | waiting_traces: []}
+
+      {{:reply, :ok, state}, %{state: state}}
+    end)
   end
 
   @spec send_and_log([Trace.t()], State.t()) :: :ok
