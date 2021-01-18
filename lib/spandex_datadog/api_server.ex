@@ -84,7 +84,7 @@ defmodule SpandexDatadog.ApiServer do
   """
   @spec init(opts :: Keyword.t()) :: {:ok, State.t()}
   def init(opts) do
-    {:ok, agent_pid} = Agent.start_link(fn -> 0 end, name: :spandex_currently_send_count)
+    {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
 
     state = %State{
       asynchronous_send?: true,

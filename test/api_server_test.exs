@@ -25,7 +25,7 @@ defmodule SpandexDatadog.ApiServerTest do
   end
 
   setup_all do
-    {:ok, agent_pid} = Agent.start_link(fn -> 0 end, name: :spandex_currently_send_count)
+    {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
     trace_id = 4_743_028_846_331_200_905
 
     {:ok, span_1} =
