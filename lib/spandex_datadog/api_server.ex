@@ -147,51 +147,47 @@ defmodule SpandexDatadog.ApiServer do
           agent_pid: agent_pid
         } = state
       ) do
-    :telemetry.span([:spandex_datadog, :handle_call, :send_trace], %{trace: trace, state: state}, fn ->
-      all_traces = [trace | waiting_traces]
+    all_traces = [trace | waiting_traces]
 
-      if verbose? do
-        trace_count = length(all_traces)
+    if verbose? do
+      trace_count = length(all_traces)
 
-        span_count = Enum.reduce(all_traces, 0, fn trace, acc -> acc + length(trace.spans) end)
+      span_count = Enum.reduce(all_traces, 0, fn trace, acc -> acc + length(trace.spans) end)
 
-        Logger.info(fn -> "Sending #{trace_count} traces, #{span_count} spans." end)
+      Logger.info(fn -> "Sending #{trace_count} traces, #{span_count} spans." end)
 
-        Logger.debug(fn -> "Trace: #{inspect(all_traces)}" end)
-      end
+      Logger.debug(fn -> "Trace: #{inspect(all_traces)}" end)
+    end
 
-      if asynchronous? do
-        below_sync_threshold? =
-          Agent.get_and_update(agent_pid, fn count ->
-            if count < sync_threshold do
-              {true, count + 1}
-            else
-              {false, count}
-            end
-          end)
+    if asynchronous? do
+      below_sync_threshold? =
+        Agent.get_and_update(agent_pid, fn count ->
+          if count < sync_threshold do
+            {true, count + 1}
+          else
+            {false, count}
+          end
+        end)
 
-        if below_sync_threshold? do
-          Task.start(fn ->
-            try do
-              send_and_log(all_traces, state)
-            after
-              Agent.update(agent_pid, fn count -> count - 1 end)
-            end
-          end)
-        else
-          # We get benefits from running in a separate process (like better GC)
-          # So we async/await here to mimic the behavour above but still apply backpressure
-          task = Task.async(fn -> send_and_log(all_traces, state) end)
-          Task.await(task)
-        end
+      if below_sync_threshold? do
+        Task.start(fn ->
+          try do
+            send_and_log(all_traces, state)
+          after
+            Agent.update(agent_pid, fn count -> count - 1 end)
+          end
+        end)
       else
-        send_and_log(all_traces, state)
+        # We get benefits from running in a separate process (like better GC)
+        # So we async/await here to mimic the behavour above but still apply backpressure
+        task = Task.async(fn -> send_and_log(all_traces, state) end)
+        Task.await(task)
       end
+    else
+      send_and_log(all_traces, state)
+    end
 
-      state = %{state | waiting_traces: []}
-
-      {{:reply, :ok, state}, %{state: state}}
-    end)
+    {:reply, :ok, %{state | waiting_traces: []}}
   end
 
   @spec send_and_log([Trace.t()], State.t()) :: :ok
