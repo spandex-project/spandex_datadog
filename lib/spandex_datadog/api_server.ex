@@ -109,7 +109,7 @@ defmodule SpandexDatadog.ApiServer do
     :telemetry.span([:spandex_datadog, :send_trace], %{trace: trace}, fn ->
       timeout = Keyword.get(opts, :timeout, 30_000)
       result = GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
-      {result, %{result: result}}
+      {result, %{trace: trace}}
     end)
   end
 
