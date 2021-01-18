@@ -198,7 +198,7 @@ defmodule SpandexDatadog.ApiServer do
     %{
       asynchronous_send?: async?,
       verbose?: verbose?,
-      waiting_traces: traces,
+      waiting_traces: traces
     } = state
 
     if verbose? do
