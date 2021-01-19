@@ -5,6 +5,14 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [1.1.0](https://github.com/spandex-project/spandex_datadog/compare/1.0.0...1.1.0) (2021-01-19)
+
+### Features:
+
+* Add Telemetry for ApiServer [#28](https://github.com/spandex-project/spandex_datadog/pull/28)
+
+
+
 ## [1.0.0](https://github.com/spandex-project/spandex_datadog/compare/0.6.0...1.0.0) (2020-05-22)
 ### Breaking Changes:
 
