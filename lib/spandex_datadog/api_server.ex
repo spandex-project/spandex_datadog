@@ -123,71 +123,13 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @doc false
-  def handle_call(
-        {:send_trace, trace},
-        _from,
-        %State{waiting_traces: waiting_traces, batch_size: batch_size, verbose?: verbose?} = state
-      )
-      when length(waiting_traces) + 1 < batch_size do
-    if verbose? do
-      Logger.info(fn -> "Adding trace to stack with #{Enum.count(trace.spans)} spans" end)
-    end
+  def handle_call({:send_trace, trace}, _from, state) do
+    state =
+      state
+      |> enqueue_trace(trace)
+      |> maybe_flush_traces()
 
-    {:reply, :ok, %{state | waiting_traces: [trace | waiting_traces]}}
-  end
-
-  def handle_call(
-        {:send_trace, trace},
-        _from,
-        %State{
-          verbose?: verbose?,
-          asynchronous_send?: asynchronous?,
-          waiting_traces: waiting_traces,
-          sync_threshold: sync_threshold,
-          agent_pid: agent_pid
-        } = state
-      ) do
-    all_traces = [trace | waiting_traces]
-
-    if verbose? do
-      trace_count = length(all_traces)
-
-      span_count = Enum.reduce(all_traces, 0, fn trace, acc -> acc + length(trace.spans) end)
-
-      Logger.info(fn -> "Sending #{trace_count} traces, #{span_count} spans." end)
-
-      Logger.debug(fn -> "Trace: #{inspect(all_traces)}" end)
-    end
-
-    if asynchronous? do
-      below_sync_threshold? =
-        Agent.get_and_update(agent_pid, fn count ->
-          if count < sync_threshold do
-            {true, count + 1}
-          else
-            {false, count}
-          end
-        end)
-
-      if below_sync_threshold? do
-        Task.start(fn ->
-          try do
-            send_and_log(all_traces, state)
-          after
-            Agent.update(agent_pid, fn count -> count - 1 end)
-          end
-        end)
-      else
-        # We get benefits from running in a separate process (like better GC)
-        # So we async/await here to mimic the behavour above but still apply backpressure
-        task = Task.async(fn -> send_and_log(all_traces, state) end)
-        Task.await(task)
-      end
-    else
-      send_and_log(all_traces, state)
-    end
-
-    {:reply, :ok, %{state | waiting_traces: []}}
+    {:reply, :ok, state}
   end
 
   @spec send_and_log([Trace.t()], State.t()) :: :ok
@@ -239,6 +181,63 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   # Private Helpers
+
+  defp enqueue_trace(state, trace) do
+    if state.verbose? do
+      Logger.info(fn -> "Adding trace to stack with #{Enum.count(trace.spans)} spans" end)
+    end
+
+    %State{state | waiting_traces: [trace | state.waiting_traces]}
+  end
+
+  defp maybe_flush_traces(%{waiting_traces: traces, batch_size: size} = state) when length(traces) < size do
+    state
+  end
+
+  defp maybe_flush_traces(state) do
+    %{
+      asynchronous_send?: async?,
+      verbose?: verbose?,
+      waiting_traces: traces
+    } = state
+
+    if verbose? do
+      span_count = Enum.reduce(traces, 0, fn trace, acc -> acc + length(trace.spans) end)
+      Logger.info(fn -> "Sending #{length(traces)} traces, #{span_count} spans." end)
+      Logger.debug(fn -> "Trace: #{inspect(traces)}" end)
+    end
+
+    if async? do
+      if below_sync_threshold?(state) do
+        Task.start(fn ->
+          try do
+            send_and_log(traces, state)
+          after
+            Agent.update(state.agent_pid, fn count -> count - 1 end)
+          end
+        end)
+      else
+        # We get benefits from running in a separate process (like better GC)
+        # So we async/await here to mimic the behavour above but still apply backpressure
+        task = Task.async(fn -> send_and_log(traces, state) end)
+        Task.await(task)
+      end
+    else
+      send_and_log(traces, state)
+    end
+
+    %State{state | waiting_traces: []}
+  end
+
+  defp below_sync_threshold?(state) do
+    Agent.get_and_update(state.agent_pid, fn count ->
+      if count < state.sync_threshold do
+        {true, count + 1}
+      else
+        {false, count}
+      end
+    end)
+  end
 
   @spec meta(Span.t()) :: map
   defp meta(span) do

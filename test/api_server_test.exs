@@ -236,12 +236,14 @@ defmodule SpandexDatadog.ApiServerTest do
         |> Map.put(:verbose?, true)
         |> Map.put(:http, TestErrorApiServer)
 
-      [processing, received_spans, response] =
+      [enqueue, processing, received_spans, response] =
         capture_log(fn ->
           {:reply, :ok, _} = ApiServer.handle_call({:send_trace, trace}, self(), state)
         end)
         |> String.split("\n")
         |> Enum.reject(fn s -> s == "" end)
+
+      assert enqueue =~ ~r/Adding trace to stack with 3 spans/
 
       assert processing =~ ~r/Sending 1 traces, 3 spans/
 
