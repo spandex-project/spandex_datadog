@@ -84,7 +84,7 @@ defmodule SpandexDatadog.ApiServer do
   """
   @spec init(opts :: Keyword.t()) :: {:ok, State.t()}
   def init(opts) do
-    {:ok, agent_pid} = Agent.start_link(fn -> 0 end, name: :spandex_currently_send_count)
+    {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
 
     state = %State{
       asynchronous_send?: true,
@@ -106,8 +106,11 @@ defmodule SpandexDatadog.ApiServer do
   """
   @spec send_trace(Trace.t(), Keyword.t()) :: :ok
   def send_trace(%Trace{} = trace, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, 30_000)
-    GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
+    :telemetry.span([:spandex_datadog, :send_trace], %{trace: trace}, fn ->
+      timeout = Keyword.get(opts, :timeout, 30_000)
+      result = GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
+      {result, %{trace: trace}}
+    end)
   end
 
   @deprecated "Please use send_trace/2 instead"

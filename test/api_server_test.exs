@@ -1,5 +1,5 @@
 defmodule SpandexDatadog.ApiServerTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
 
@@ -24,8 +24,21 @@ defmodule SpandexDatadog.ApiServerTest do
     end
   end
 
+  defmodule TestSlowApiServer do
+    def put(_url, _body, _headers) do
+      Process.sleep(500)
+      {:error, :timeout}
+    end
+  end
+
+  defmodule TelemetryRecorderPDict do
+    def handle_event(event, measurements, metadata, _cfg) do
+      Process.put(event, {measurements, metadata})
+    end
+  end
+
   setup_all do
-    {:ok, agent_pid} = Agent.start_link(fn -> 0 end, name: :spandex_currently_send_count)
+    {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
     trace_id = 4_743_028_846_331_200_905
 
     {:ok, span_1} =
@@ -82,6 +95,65 @@ defmodule SpandexDatadog.ApiServerTest do
         }
       ]
     }
+  end
+
+  describe "ApiServer.send_trace/2" do
+    test "executes telemetry on success", %{trace: trace} do
+      :telemetry.attach_many(
+        "log-response-handler",
+        [
+          [:spandex_datadog, :send_trace, :start],
+          [:spandex_datadog, :send_trace, :stop],
+          [:spandex_datadog, :send_trace, :exception]
+        ],
+        &TelemetryRecorderPDict.handle_event/4,
+        nil
+      )
+
+      ApiServer.start_link(http: TestOkApiServer)
+
+      ApiServer.send_trace(trace)
+
+      {start_measurements, start_metadata} = Process.get([:spandex_datadog, :send_trace, :start])
+      assert start_measurements[:system_time]
+      assert trace == start_metadata[:trace]
+
+      {stop_measurements, stop_metadata} = Process.get([:spandex_datadog, :send_trace, :stop])
+      assert stop_measurements[:duration]
+      assert trace == stop_metadata[:trace]
+
+      refute Process.get([:spandex_datadog, :send_trace, :exception])
+    end
+
+    test "executes telemetry on exception", %{trace: trace} do
+      :telemetry.attach_many(
+        "log-response-handler",
+        [
+          [:spandex_datadog, :send_trace, :start],
+          [:spandex_datadog, :send_trace, :stop],
+          [:spandex_datadog, :send_trace, :exception]
+        ],
+        &TelemetryRecorderPDict.handle_event/4,
+        nil
+      )
+
+      ApiServer.start_link(http: TestSlowApiServer, batch_size: 0, sync_threshold: 0)
+
+      catch_exit(ApiServer.send_trace(trace, timeout: 1))
+
+      {start_measurements, start_metadata} = Process.get([:spandex_datadog, :send_trace, :start])
+      assert start_measurements[:system_time]
+      assert trace == start_metadata[:trace]
+
+      refute Process.get([:spandex_datadog, :send_trace, :stop])
+
+      {exception_measurements, exception_metadata} = Process.get([:spandex_datadog, :send_trace, :exception])
+      assert exception_measurements[:duration]
+      assert trace == start_metadata[:trace]
+      assert :exit == exception_metadata[:kind]
+      assert nil == exception_metadata[:error]
+      assert is_list(exception_metadata[:stacktrace])
+    end
   end
 
   describe "ApiServer.handle_call/3 - :send_trace" do
