@@ -59,10 +59,6 @@ defmodule SpandexDatadog.ApiServer.Buffer do
     end
   end
 
-  defp delete_spec(index) do
-    match_spec(index, true)
-  end
-
   def select_spec(index) do
     # If we're selecting stuff we need to get the second element
     match_spec(index, :"$2")
