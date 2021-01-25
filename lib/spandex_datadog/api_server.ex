@@ -96,6 +96,8 @@ defmodule SpandexDatadog.ApiServer do
   # Leaving these here for api versioning purposes. But this logic has
   # been moved to the client module.
   @doc false
+  @deprecated "Please use format/3 instead"
+  @spec format(Trace.t() | Span.t()) :: map()
   def format(trace), do: Client.format(trace)
 
   @doc false

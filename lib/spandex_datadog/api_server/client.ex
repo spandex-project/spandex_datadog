@@ -31,13 +31,11 @@ defmodule SpandexDatadog.ApiServer.Client do
     :ok
   end
 
-  @deprecated "Please use format/3 instead"
   @spec format(Trace.t()) :: map()
   def format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
     Enum.map(spans, fn span -> format(span, priority, baggage) end)
   end
 
-  @deprecated "Please use format/3 instead"
   @spec format(Span.t()) :: map()
   def format(%Span{} = span), do: format(span, 1, [])
 
