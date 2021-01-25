@@ -34,13 +34,11 @@ defmodule SpandexDatadog.ApiServer.Reporter do
   def init(opts) do
     host  = opts[:host]
     port  = opts[:port]
-    state = %{
-      buffer: opts[:buffer],
-      collector_url: "#{host}:#{port}/v0.3/traces",
-      verbose?: opts[:verbose?],
-      http: opts[:http],
-      flush_period: opts[:flush_period] || 1_000,
-    }
+    collector_url = "#{host}:#{port}/v0.3/traces"
+    state =
+      opts
+      |> update_in([:flush_period], & &1 || 1_000)
+      |> put_in([:collector_url], collector_url)
 
     schedule(state.flush_period)
 
@@ -49,7 +47,10 @@ defmodule SpandexDatadog.ApiServer.Reporter do
 
   # Only used for development and testing purposes
   def handle_call(:flush, _, state) do
-    flush(state)
+    # this little dance is hella weird, but it ensures that we can call this
+    # with backpressure in tests and we don't need to duplicate code in lots of
+    # places.
+    handle_info(:flush, state)
     {:reply, :ok, state}
   end
 
@@ -62,7 +63,14 @@ defmodule SpandexDatadog.ApiServer.Reporter do
   end
 
   def handle_info(:flush, state) do
-    flush(state)
+    # Run this function in a task to avoid bloating this processes binary memory
+    # and generally optimize GC. We're not really protecting ourselves from failure
+    # here because if the task exits, we're going to exit as well. But that's OK
+    # and is probably what we want.
+    state.task_sup
+    |> Task.Supervisor.async(fn -> flush(state) end)
+    |> Task.await()
+
     schedule(state.flush_period)
 
     {:noreply, state}
@@ -70,12 +78,16 @@ defmodule SpandexDatadog.ApiServer.Reporter do
 
   defp flush(state) do
     :telemetry.span([:spandex_datadog, :client, :flush], %{}, fn ->
-      Buffer.flush_latest(state.buffer, fn buffer ->
-        if buffer == [] do
+      Buffer.flush_latest(state.buffer, fn
+        [] ->
           :ok
-        else
-          Client.send(state.http, state.collector_url, buffer, verbose?: state.verbose?)
-        end
+
+        buffer ->
+          buffer
+          |> Enum.chunk_every(state.batch_size)
+          |> Enum.each(fn batch ->
+            Client.send(state.http, state.collector_url, batch, verbose?: state.verbose?)
+          end)
       end)
 
       {:ok, %{}}

@@ -23,14 +23,16 @@ defmodule SpandexDatadog.ApiServer do
                        http: :atom,
                        batch_size: :integer,
                        sync_threshold: :integer,
+                       max_buffer_size: :integer,
                        api_adapter: :atom
                      ],
                      defaults: [
                        host: "localhost",
                        port: 8126,
                        verbose?: false,
-                       batch_size: 10,
+                       batch_size: 50,
                        sync_threshold: 20,
+                       max_buffer_size: 5_000,
                        api_adapter: SpandexDatadog.ApiServer
                      ],
                      required: [:http],
@@ -38,6 +40,7 @@ defmodule SpandexDatadog.ApiServer do
                        verbose?: "Only to be used for debugging: All finished traces will be logged",
                        host: "The host the agent can be reached at",
                        port: "The port to use when sending traces to the agent",
+                       max_buffer_size: "The maximum number of traces that will be buffered.",
                        batch_size: "The number of traces that should be sent in a single batch",
                        sync_threshold:
                          "The maximum number of processes that may be sending traces at any one time. This adds backpressure",
@@ -60,14 +63,17 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   def init(opts) do
-    buffer = Buffer.new()
+    task_sup = __MODULE__.TaskSupervisor
+    buffer = Buffer.new(opts)
     reporter_opts =
       opts
       |> Map.new()
-      |> Map.take([:http, :verbose?, :host, :port])
+      |> Map.take([:http, :verbose?, :host, :port, :batch_size])
       |> Map.put(:buffer, buffer)
+      |> Map.put(:task_sup, task_sup)
 
     children = [
+      {Task.Supervisor, name: task_sup},
       {Reporter, reporter_opts},
     ]
 
