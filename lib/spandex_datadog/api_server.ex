@@ -1,6 +1,17 @@
 defmodule SpandexDatadog.ApiServer do
   @moduledoc """
   Implements worker for sending spans to datadog as GenServer in order to send traces async.
+
+  ## Options
+
+  The following options can be passed to `SpandexDatadog.ApiServer.start_link/1`:
+
+  * `:http` - The HTTP module to use for sending spans to the agent. Currently only HTTPoison has been tested. Required.
+  * `:host` - The host the agent can be reached at. Defaults to "localhost".
+  * `:port` - The port to use when sending traces to the agent. Defaults to 8126.
+  * `:verbose?` - Only to be used for debugging: All finished traces will be logged.
+  * `:batch_size` - The number of traces that should be sent in a single batch. Defaults to 10.
+  * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to 20.
   """
 
   use GenServer
@@ -35,46 +46,21 @@ defmodule SpandexDatadog.ApiServer do
 
   @headers [{"Content-Type", "application/msgpack"}]
 
-  @start_link_opts Optimal.schema(
-                     opts: [
-                       host: :string,
-                       port: [:integer, :string],
-                       verbose?: :boolean,
-                       http: :atom,
-                       batch_size: :integer,
-                       sync_threshold: :integer,
-                       api_adapter: :atom
-                     ],
-                     defaults: [
-                       host: "localhost",
-                       port: 8126,
-                       verbose?: false,
-                       batch_size: 10,
-                       sync_threshold: 20,
-                       api_adapter: SpandexDatadog.ApiServer
-                     ],
-                     required: [:http],
-                     describe: [
-                       verbose?: "Only to be used for debugging: All finished traces will be logged",
-                       host: "The host the agent can be reached at",
-                       port: "The port to use when sending traces to the agent",
-                       batch_size: "The number of traces that should be sent in a single batch",
-                       sync_threshold:
-                         "The maximum number of processes that may be sending traces at any one time. This adds backpressure",
-                       http:
-                         "The HTTP module to use for sending spans to the agent. Currently only HTTPoison has been tested",
-                       api_adapter: "Which api adapter to use. Currently only used for testing"
-                     ]
-                   )
+  @default_opts [
+    host: "localhost",
+    port: 8126,
+    verbose?: false,
+    batch_size: 10,
+    sync_threshold: 20,
+    api_adapter: SpandexDatadog.ApiServer
+  ]
 
   @doc """
   Starts genserver with given options.
-
-  #{Optimal.Doc.document(@start_link_opts)}
   """
   @spec start_link(opts :: Keyword.t()) :: GenServer.on_start()
   def start_link(opts) do
-    opts = Optimal.validate!(opts, @start_link_opts)
+    opts = Keyword.merge(@default_opts, opts)
 
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
