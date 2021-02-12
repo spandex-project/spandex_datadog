@@ -134,9 +134,11 @@ defmodule SpandexDatadog.ApiServer do
 
   @doc false
   def terminate(_reason, state) do
-    # set batch size to 0 to force any remaining traces to be flushed
+    # set batch_size to 0 to force any remaining traces to be flushed
+    # set asynchronous_send? to false to send the last traces synchronously
     state
     |> Map.put(:batch_size, 0)
+    |> Map.put(:asynchronous_send?, false)
     |> maybe_flush_traces()
 
     :ok
