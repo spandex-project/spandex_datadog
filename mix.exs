@@ -54,11 +54,12 @@ defmodule SpandexDatadog.MixProject do
     [
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:git_ops, "~> 2.0", only: [:dev]},
-      {:inch_ex, "~> 2.0", only: [:dev, :test]},
-      {:spandex, "~> 3.0"},
-      {:telemetry, "~> 0.4"},
       {:httpoison, "~> 0.13 or ~> 1.0", only: :test},
-      {:msgpax, "~> 2.2.1"}
+      {:inch_ex, "~> 2.0", only: [:dev, :test]},
+      {:mox, "~> 1.0", only: :test},
+      {:msgpax, "~> 2.2.1"},
+      {:spandex, "~> 3.0"},
+      {:telemetry, "~> 0.4"}
     ]
   end
 end

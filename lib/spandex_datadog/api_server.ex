@@ -132,6 +132,16 @@ defmodule SpandexDatadog.ApiServer do
     {:reply, :ok, state}
   end
 
+  @doc false
+  def terminate(_reason, state) do
+    # set batch size to 0 to force any remaining traces to be flushed
+    state
+    |> Map.put(:batch_size, 0)
+    |> maybe_flush_traces()
+
+    :ok
+  end
+
   @spec send_and_log([Trace.t()], State.t()) :: :ok
   def send_and_log(traces, %{verbose?: verbose?} = state) do
     headers = @headers ++ [{"X-Datadog-Trace-Count", length(traces)}]
