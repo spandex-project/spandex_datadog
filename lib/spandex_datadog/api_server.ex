@@ -43,6 +43,7 @@ defmodule SpandexDatadog.ApiServer do
                        http: :atom,
                        batch_size: :integer,
                        sync_threshold: :integer,
+                       name: :atom,
                        api_adapter: :atom
                      ],
                      defaults: [
@@ -51,6 +52,7 @@ defmodule SpandexDatadog.ApiServer do
                        verbose?: false,
                        batch_size: 10,
                        sync_threshold: 20,
+                       name: __MODULE__,
                        api_adapter: SpandexDatadog.ApiServer
                      ],
                      required: [:http],
@@ -63,6 +65,7 @@ defmodule SpandexDatadog.ApiServer do
                          "The maximum number of processes that may be sending traces at any one time. This adds backpressure",
                        http:
                          "The HTTP module to use for sending spans to the agent. Currently only HTTPoison has been tested",
+                       name: "What name the GenServer should have. Currently only used for testing",
                        api_adapter: "Which api adapter to use. Currently only used for testing"
                      ]
                    )
@@ -76,7 +79,7 @@ defmodule SpandexDatadog.ApiServer do
   def start_link(opts) do
     opts = Optimal.validate!(opts, @start_link_opts)
 
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, __MODULE__))
   end
 
   @doc """
@@ -84,6 +87,7 @@ defmodule SpandexDatadog.ApiServer do
   """
   @spec init(opts :: Keyword.t()) :: {:ok, State.t()}
   def init(opts) do
+    Process.flag(:trap_exit, true)
     {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
 
     state = %State{
@@ -133,6 +137,12 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @doc false
+  def handle_info({:EXIT, _pid, reason}, state) do
+    terminate(reason, state)
+    {:noreply, %State{state | waiting_traces: []}}
+  end
+
+  @doc false
   def terminate(_reason, state) do
     # set batch_size to 0 to force any remaining traces to be flushed
     # set asynchronous_send? to false to send the last traces synchronously
@@ -145,6 +155,11 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @spec send_and_log([Trace.t()], State.t()) :: :ok
+  def send_and_log(traces, _state) when length(traces) < 1 do
+    # no-op if there's no traces to send
+    :ok
+  end
+
   def send_and_log(traces, %{verbose?: verbose?} = state) do
     headers = @headers ++ [{"X-Datadog-Trace-Count", length(traces)}]
 
