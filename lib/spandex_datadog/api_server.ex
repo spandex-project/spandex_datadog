@@ -112,7 +112,8 @@ defmodule SpandexDatadog.ApiServer do
   def send_trace(%Trace{} = trace, opts \\ []) do
     :telemetry.span([:spandex_datadog, :send_trace], %{trace: trace}, fn ->
       timeout = Keyword.get(opts, :timeout, 30_000)
-      result = GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
+      genserver_name = Keyword.get(opts, :name, __MODULE__)
+      result = GenServer.call(genserver_name, {:send_trace, trace}, timeout)
       {result, %{trace: trace}}
     end)
   end
@@ -123,7 +124,8 @@ defmodule SpandexDatadog.ApiServer do
   def send_spans(spans, opts \\ []) when is_list(spans) do
     timeout = Keyword.get(opts, :timeout, 30_000)
     trace = %Trace{spans: spans}
-    GenServer.call(__MODULE__, {:send_trace, trace}, timeout)
+    genserver_name = Keyword.get(opts, :name, __MODULE__)
+    GenServer.call(genserver_name, {:send_trace, trace}, timeout)
   end
 
   @doc false

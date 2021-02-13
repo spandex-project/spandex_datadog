@@ -110,9 +110,9 @@ defmodule SpandexDatadog.ApiServerTest do
         nil
       )
 
-      ApiServer.start_link(http: TestOkApiServer)
+      assert {:ok, _pid} = ApiServer.start_link(http: TestOkApiServer, name: __MODULE__)
 
-      ApiServer.send_trace(trace)
+      ApiServer.send_trace(trace, name: __MODULE__)
 
       {start_measurements, start_metadata} = Process.get([:spandex_datadog, :send_trace, :start])
       assert start_measurements[:system_time]
