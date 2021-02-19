@@ -269,8 +269,8 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @spec add_error_type(map, Exception.t() | nil) :: map
-  defp add_error_type(meta, nil), do: meta
-  defp add_error_type(meta, exception), do: Map.put(meta, "error.type", exception.__struct__)
+  defp add_error_type(meta, %struct{}), do: Map.put(meta, "error.type", struct)
+  defp add_error_type(meta, _), do: meta
 
   @spec add_error_message(map, Exception.t() | nil) :: map
   defp add_error_message(meta, nil), do: meta
