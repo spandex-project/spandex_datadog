@@ -26,7 +26,8 @@ defmodule SpandexDatadog.ApiServer do
       :waiting_traces,
       :batch_size,
       :sync_threshold,
-      :agent_pid
+      :agent_pid,
+      :container_id
     ]
   end
 
@@ -95,10 +96,26 @@ defmodule SpandexDatadog.ApiServer do
       waiting_traces: [],
       batch_size: opts[:batch_size],
       sync_threshold: opts[:sync_threshold],
-      agent_pid: agent_pid
+      agent_pid: agent_pid,
+      container_id: get_container_id()
     }
 
     {:ok, state}
+  end
+
+  @cgroup_uuid "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
+  @cgroup_ctnr "[0-9a-f]{64}"
+  @cgroup_task "[0-9a-f]{32}-\\d+"
+  @cgroup_regex Regex.compile!("/(#{@cgroup_uuid}|#{@cgroup_ctnr}|#{@cgroup_task})(?:.scope)?$", "m")
+
+  defp get_container_id() do
+    with {:ok, file_binary} <- File.read("/proc/self/cgroup"),
+         true <- String.valid?(file_binary),
+         [_, container_id] <- Regex.run(@cgroup_regex, file_binary) do
+      container_id
+    else
+      _ -> nil
+    end
   end
 
   @doc """
@@ -133,8 +150,9 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @spec send_and_log([Trace.t()], State.t()) :: :ok
-  def send_and_log(traces, %{verbose?: verbose?} = state) do
+  def send_and_log(traces, %{container_id: container_id, verbose?: verbose?} = state) do
     headers = @headers ++ [{"X-Datadog-Trace-Count", length(traces)}]
+    headers = headers ++ List.wrap(if container_id, do: {"Datadog-Container-ID", container_id})
 
     response =
       traces
