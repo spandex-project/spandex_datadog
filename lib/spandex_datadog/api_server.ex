@@ -110,7 +110,6 @@ defmodule SpandexDatadog.ApiServer do
 
   defp get_container_id() do
     with {:ok, file_binary} <- File.read("/proc/self/cgroup"),
-         true <- String.valid?(file_binary),
          [_, container_id] <- Regex.run(@cgroup_regex, file_binary) do
       container_id
     else
