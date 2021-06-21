@@ -9,17 +9,22 @@ defmodule SpandexDatadog.ApiServerTest do
   }
 
   alias SpandexDatadog.ApiServer
+  alias SpandexDatadog.ApiServer.Reporter
+
+  @pid_key {:test_module, :test_pid}
 
   defmodule TestOkApiServer do
     def put(url, body, headers) do
-      send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
+      test_pid = :persistent_term.get({:test_module, :test_pid})
+      send(test_pid, {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
       {:ok, %HTTPoison.Response{status_code: 200}}
     end
   end
 
   defmodule TestErrorApiServer do
     def put(url, body, headers) do
-      send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
+      test_pid = :persistent_term.get({:test_module, :test_pid})
+      send(test_pid, {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
       {:error, %HTTPoison.Error{id: :foo, reason: :bar}}
     end
   end
@@ -38,7 +43,6 @@ defmodule SpandexDatadog.ApiServerTest do
   end
 
   setup_all do
-    {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
     trace_id = 4_743_028_846_331_200_905
 
     {:ok, span_1} =
@@ -78,23 +82,29 @@ defmodule SpandexDatadog.ApiServerTest do
 
     trace = %Trace{spans: [span_1, span_2, span_3]}
 
+    start_supervised({ApiServer, [
+      host: "localhost",
+      port: "8126",
+      http: TestOkApiServer,
+      verbose?: false
+    ]})
+
     {
       :ok,
       [
         trace: trace,
-        url: "localhost:8126/v0.3/traces",
-        state: %ApiServer.State{
-          asynchronous_send?: false,
-          host: "localhost",
-          port: "8126",
-          http: TestOkApiServer,
-          verbose?: false,
-          waiting_traces: [],
-          batch_size: 1,
-          agent_pid: agent_pid
-        }
+        url: "localhost:8126/v0.3/traces"
       ]
     }
+  end
+
+  setup do
+    :persistent_term.put(@pid_key, self())
+    Reporter.set_http_client(TestOkApiServer)
+    Reporter.disable_verbose_logging()
+    Reporter.flush()
+
+    :ok
   end
 
   describe "ApiServer.send_trace/2" do
@@ -124,43 +134,14 @@ defmodule SpandexDatadog.ApiServerTest do
 
       refute Process.get([:spandex_datadog, :send_trace, :exception])
     end
-
-    test "executes telemetry on exception", %{trace: trace} do
-      :telemetry.attach_many(
-        "log-response-handler",
-        [
-          [:spandex_datadog, :send_trace, :start],
-          [:spandex_datadog, :send_trace, :stop],
-          [:spandex_datadog, :send_trace, :exception]
-        ],
-        &TelemetryRecorderPDict.handle_event/4,
-        nil
-      )
-
-      ApiServer.start_link(http: TestSlowApiServer, batch_size: 0, sync_threshold: 0)
-
-      catch_exit(ApiServer.send_trace(trace, timeout: 1))
-
-      {start_measurements, start_metadata} = Process.get([:spandex_datadog, :send_trace, :start])
-      assert start_measurements[:system_time]
-      assert trace == start_metadata[:trace]
-
-      refute Process.get([:spandex_datadog, :send_trace, :stop])
-
-      {exception_measurements, exception_metadata} = Process.get([:spandex_datadog, :send_trace, :exception])
-      assert exception_measurements[:duration]
-      assert trace == start_metadata[:trace]
-      assert :exit == exception_metadata[:kind]
-      assert nil == exception_metadata[:error]
-      assert is_list(exception_metadata[:stacktrace])
-    end
   end
 
-  describe "ApiServer.handle_call/3 - :send_trace" do
-    test "doesn't log anything when verbose?: false", %{trace: trace, state: state, url: url} do
+  describe "flushing traces" do
+    test "doesn't log anything when verbose?: false", %{trace: trace, url: url} do
       log =
         capture_log(fn ->
-          ApiServer.handle_call({:send_trace, trace}, self(), state)
+          ApiServer.send_trace(trace)
+          Reporter.flush()
         end)
 
       assert log == ""
@@ -230,24 +211,17 @@ defmodule SpandexDatadog.ApiServerTest do
       assert_received {:put_datadog_spans, ^formatted, ^url, ^headers}
     end
 
-    test "doesn't care about the response result", %{trace: trace, state: state, url: url} do
-      state =
-        state
-        |> Map.put(:verbose?, true)
-        |> Map.put(:http, TestErrorApiServer)
+    test "doesn't care about the response result", %{trace: trace, url: url} do
+      Reporter.set_http_client(TestErrorApiServer)
+      Reporter.enable_verbose_logging()
 
-      [enqueue, processing, received_spans, response] =
+      [response] =
         capture_log(fn ->
-          {:reply, :ok, _} = ApiServer.handle_call({:send_trace, trace}, self(), state)
+          ApiServer.send_trace(trace)
+          Reporter.flush()
         end)
         |> String.split("\n")
         |> Enum.reject(fn s -> s == "" end)
-
-      assert enqueue =~ ~r/Adding trace to stack with 3 spans/
-
-      assert processing =~ ~r/Sending 1 traces, 3 spans/
-
-      assert received_spans =~ ~r/Trace: \[%Spandex.Trace{/
 
       formatted = [
         %{
