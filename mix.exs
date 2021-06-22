@@ -58,7 +58,7 @@ defmodule SpandexDatadog.MixProject do
       {:spandex, "~> 3.0"},
       {:telemetry, "~> 0.4"},
       {:httpoison, "~> 0.13 or ~> 1.0", only: :test},
-      {:msgpax, "~> 2.2.1"}
+      {:msgpax, "~> 2.3"}
     ]
   end
 end
