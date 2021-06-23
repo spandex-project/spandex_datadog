@@ -167,9 +167,19 @@ defmodule SpandexDatadog.ApiServer do
      }}
   end
 
-  def idle(:enter, _old_state, %State{scheduled_delay_ms: send_interval} = state) do
+  def idle(
+        :enter,
+        _old_state,
+        %State{scheduled_delay_ms: send_interval, check_table_size_ms: size_check_interval} = state
+      ) do
     if state.verbose?, do: Logger.debug("idle(:enter, _, _)")
-    {:keep_state_and_data, [{{:timeout, :export_spans}, send_interval, :export_spans}]}
+
+    actions = [
+      {{:timeout, :export_spans}, send_interval, :export_spans},
+      {{:timeout, :check_table_size}, size_check_interval, :check_table_size}
+    ]
+
+    {:keep_state_and_data, actions}
   end
 
   def idle(_, :export_spans, state) do
@@ -190,18 +200,24 @@ defmodule SpandexDatadog.ApiServer do
   def exporting(
         :enter,
         _old_state,
-        %State{exporting_timeout_ms: exporting_timeout, scheduled_delay_ms: send_interval} = state
+        %State{
+          exporting_timeout_ms: exporting_timeout,
+          scheduled_delay_ms: send_interval,
+          check_table_size_ms: size_check_interval
+        } = state
       ) do
     if state.verbose?, do: Logger.debug("exporting(:enter, _, _)")
     {old_table_name, runner_pid} = export_spans(state)
 
     Logger.debug("After Export Spans")
 
-    {:keep_state, %State{state | runner_pid: runner_pid, handed_off_table: old_table_name},
-     [
-       {:state_timeout, exporting_timeout, :exporting_timeout},
-       {{:timeout, :export_spans}, send_interval, :export_spans}
-     ]}
+    actions = [
+      {:state_timeout, exporting_timeout, :exporting_timeout},
+      {{:timeout, :export_spans}, send_interval, :export_spans},
+      {{:timeout, :check_table_size}, size_check_interval, :check_table_size}
+    ]
+
+    {:keep_state, %State{state | runner_pid: runner_pid, handed_off_table: old_table_name}, actions}
   end
 
   def exporting(:state_timeout, :exporting_timeout, %State{handed_off_table: exporting_table} = state) do
