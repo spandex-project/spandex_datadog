@@ -65,7 +65,9 @@ defmodule SpandexDatadog.ApiServer do
                        max_queue_size: :integer,
                        scheduled_delay_ms: :integer,
                        export_timeout_ms: :integer,
-                       check_table_size_ms: :integer
+                       check_table_size_ms: :integer,
+                       sync_threshold: :integer,
+                       batch_size: :integer
                      ],
                      defaults: [
                        host: "localhost",
@@ -87,7 +89,9 @@ defmodule SpandexDatadog.ApiServer do
                        api_adapter: "Which api adapter to use. Currently only used for testing",
                        scheduled_delay_ms: "Interval for sending a batch",
                        export_timeout_ms: "Timeout to allow each export operation to run",
-                       check_table_size_ms: "Interval to check the size of the buffer"
+                       check_table_size_ms: "Interval to check the size of the buffer",
+                       sync_threshold: "depreciated",
+                       batch_size: "depreciated"
                      ]
                    )
 
@@ -149,12 +153,6 @@ defmodule SpandexDatadog.ApiServer do
 
     enable()
 
-    max_queue_size =
-      case opts[:max_queue_size] do
-        :infinity -> :infinity
-        size_limit -> div(size_limit, :erlang.system_info(:wordsize))
-      end
-
     {:ok, :idle,
      %State{
        host: opts[:host],
@@ -162,7 +160,7 @@ defmodule SpandexDatadog.ApiServer do
        verbose?: opts[:verbose?],
        http: opts[:http],
        handed_off_table: :undefined,
-       max_queue_size: max_queue_size,
+       max_queue_size: opts[:max_queue_size],
        exporting_timeout_ms: opts[:export_timeout_ms],
        check_table_size_ms: opts[:check_table_size_ms],
        scheduled_delay_ms: opts[:scheduled_delay_ms]
@@ -242,7 +240,12 @@ defmodule SpandexDatadog.ApiServer do
   def handle_event_(_state, {:timeout, :check_table_size}, :check_table_size, %State{
         max_queue_size: max_queue_size
       }) do
-    case :ets.info(current_table(), :size) do
+    tab_memory = :ets.info(current_table(), :memory)
+    tab_size = :ets.info(current_table(), :size)
+    bytes = tab_memory * :erlang.system_info(:wordsize)
+    :telemetry.execute([:spandex_datadog, :buffer, :info], %{bytes: bytes, items: tab_size})
+
+    case bytes do
       m when m >= max_queue_size ->
         disable()
         :keep_state_and_data
