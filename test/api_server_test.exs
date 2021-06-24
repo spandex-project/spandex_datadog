@@ -153,7 +153,7 @@ defmodule SpandexDatadog.ApiServerTest do
         nil
       )
 
-      start_supervised!({ApiServer, http: TestOkApiServer, verbose?: true, scheduled_delay_ms: 50})
+      start_supervised!({ApiServer, http: TestOkApiServer, verbose?: true, send_interval: 50})
 
       ApiServer.send_trace(trace)
 
@@ -232,7 +232,7 @@ defmodule SpandexDatadog.ApiServerTest do
 
     test "doesn't care about the response result", %{trace: trace, url: url} do
       :persistent_term.put(:test_pid, self())
-      start_supervised!({ApiServer, http: TestErrorApiServer, verbose?: true, scheduled_delay_ms: 50})
+      start_supervised!({ApiServer, http: TestErrorApiServer, verbose?: true, send_interval: 50})
 
       ApiServer.send_trace(trace)
 

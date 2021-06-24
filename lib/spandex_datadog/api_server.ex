@@ -8,17 +8,18 @@ defmodule SpandexDatadog.ApiServer do
   require Logger
 
   alias Spandex.{Span, Trace}
+  alias SpandexDatadog.Formatter
 
   defmodule State do
     @moduledoc false
 
     @type t :: %__MODULE__{
-            scheduled_delay_ms: non_neg_integer(),
-            exporting_timeout_ms: non_neg_integer(),
+            send_interval: non_neg_integer(),
+            export_timeout: non_neg_integer(),
             runner_pid: pid(),
             handed_off_table: :ets.tab(),
             max_queue_size: non_neg_integer(),
-            check_table_size_ms: non_neg_integer(),
+            size_check_interval: non_neg_integer(),
             http: atom(),
             url: String.t(),
             host: String.t(),
@@ -27,12 +28,12 @@ defmodule SpandexDatadog.ApiServer do
           }
 
     defstruct [
-      :scheduled_delay_ms,
-      :exporting_timeout_ms,
+      :send_interval,
+      :export_timeout,
       :runner_pid,
       :handed_off_table,
       :max_queue_size,
-      :check_table_size_ms,
+      :size_check_interval,
       :http,
       :url,
       :host,
@@ -55,6 +56,8 @@ defmodule SpandexDatadog.ApiServer do
   # https://github.com/DataDog/datadog-agent/blob/fa227f0015a5da85617e8af30778fcfc9521e568/pkg/trace/api/api.go#L46
   @dd_limit 10 * 1024 * 1024
 
+  @ets_batch 100
+
   @start_link_opts Optimal.schema(
                      opts: [
                        host: :string,
@@ -63,9 +66,9 @@ defmodule SpandexDatadog.ApiServer do
                        http: :atom,
                        api_adapter: :atom,
                        max_queue_size: :integer,
-                       scheduled_delay_ms: :integer,
-                       export_timeout_ms: :integer,
-                       check_table_size_ms: :integer,
+                       send_interval: :integer,
+                       export_timeout: :integer,
+                       size_check_interval: :integer,
                        sync_threshold: :integer,
                        batch_size: :integer
                      ],
@@ -75,9 +78,9 @@ defmodule SpandexDatadog.ApiServer do
                        verbose?: false,
                        api_adapter: SpandexDatadog.ApiServer,
                        max_queue_size: 20 * 1024 * 1024,
-                       scheduled_delay_ms: :timer.seconds(2),
-                       export_timeout_ms: :timer.minutes(1),
-                       check_table_size_ms: 500
+                       send_interval: :timer.seconds(2),
+                       export_timeout: :timer.minutes(1),
+                       size_check_interval: 500
                      ],
                      required: [:http],
                      describe: [
@@ -87,13 +90,18 @@ defmodule SpandexDatadog.ApiServer do
                        http:
                          "The HTTP module to use for sending spans to the agent. Currently only HTTPoison has been tested",
                        api_adapter: "Which api adapter to use. Currently only used for testing",
-                       scheduled_delay_ms: "Interval for sending a batch",
-                       export_timeout_ms: "Timeout to allow each export operation to run",
-                       check_table_size_ms: "Interval to check the size of the buffer",
+                       send_interval: "Interval for sending a batch",
+                       export_timeout: "Timeout to allow each export operation to run",
+                       size_check_interval: "Interval to check the size of the buffer",
                        sync_threshold: "depreciated",
                        batch_size: "depreciated"
                      ]
                    )
+
+  # Public Functions
+
+  defdelegate format(trace_or_span), to: Formatter
+  defdelegate format(span, priority, baggage), to: Formatter
 
   def child_spec(opts) do
     %{
@@ -144,6 +152,22 @@ defmodule SpandexDatadog.ApiServer do
     do_insert(trace)
   end
 
+  def enable do
+    Logger.info("%{__MODULE__} is enabled")
+    :persistent_term.put(@enabled_key, true)
+  end
+
+  def disable do
+    Logger.info("%{__MODULE__} is disabled")
+    :persistent_term.put(@enabled_key, false)
+  end
+
+  def is_enabled do
+    :persistent_term.get(@enabled_key, true)
+  end
+
+  # Callbacks
+
   def init(opts) do
     Process.flag(:trap_exit, true)
 
@@ -161,16 +185,16 @@ defmodule SpandexDatadog.ApiServer do
        http: opts[:http],
        handed_off_table: :undefined,
        max_queue_size: opts[:max_queue_size],
-       exporting_timeout_ms: opts[:export_timeout_ms],
-       check_table_size_ms: opts[:check_table_size_ms],
-       scheduled_delay_ms: opts[:scheduled_delay_ms]
+       export_timeout: opts[:export_timeout],
+       size_check_interval: opts[:size_check_interval],
+       send_interval: opts[:send_interval]
      }}
   end
 
   def idle(
         :enter,
         _old_state,
-        %State{scheduled_delay_ms: send_interval, check_table_size_ms: size_check_interval} = state
+        %State{send_interval: send_interval, size_check_interval: size_check_interval} = state
       ) do
     if state.verbose?, do: Logger.debug("idle(:enter, _, _)")
 
@@ -201,15 +225,13 @@ defmodule SpandexDatadog.ApiServer do
         :enter,
         _old_state,
         %State{
-          exporting_timeout_ms: exporting_timeout,
-          scheduled_delay_ms: send_interval,
-          check_table_size_ms: size_check_interval
+          export_timeout: exporting_timeout,
+          send_interval: send_interval,
+          size_check_interval: size_check_interval
         } = state
       ) do
     if state.verbose?, do: Logger.debug("exporting(:enter, _, _)")
     {old_table_name, runner_pid} = export_spans(state)
-
-    Logger.debug("After Export Spans")
 
     actions = [
       {:state_timeout, exporting_timeout, :exporting_timeout},
@@ -249,13 +271,21 @@ defmodule SpandexDatadog.ApiServer do
     handle_event_(:exporting, event_type, event, state)
   end
 
-  def handle_event_(_state, {:timeout, :check_table_size}, :check_table_size, %State{max_queue_size: :infinity}) do
+  def terminate(_, _, state) do
+    if state.verbose?, do: Logger.debug("terminate/3")
+    # TODO: flush buffers to export
+    :ok
+  end
+
+  # Private Functions
+
+  defp handle_event_(_state, {:timeout, :check_table_size}, :check_table_size, %State{max_queue_size: :infinity}) do
     :keep_state_and_data
   end
 
-  def handle_event_(_state, {:timeout, :check_table_size}, :check_table_size, %State{
-        max_queue_size: max_queue_size
-      }) do
+  defp handle_event_(_state, {:timeout, :check_table_size}, :check_table_size, %State{
+         max_queue_size: max_queue_size
+       }) do
     tab_memory = :ets.info(current_table(), :memory)
     tab_size = :ets.info(current_table(), :size)
     bytes = tab_memory * :erlang.system_info(:wordsize)
@@ -272,31 +302,11 @@ defmodule SpandexDatadog.ApiServer do
     end
   end
 
-  def handle_event_(_, _, _, _) do
+  defp handle_event_(_, _, _, _) do
     :keep_state_and_data
   end
 
-  def terminate(_, _, state) do
-    if state.verbose?, do: Logger.debug("terminate/3")
-    # TODO: flush buffers to export
-    :ok
-  end
-
-  def enable do
-    Logger.debug("%{__MODULE__} is enabled")
-    :persistent_term.put(@enabled_key, true)
-  end
-
-  def disable do
-    Logger.debug("%{__MODULE__} is disabled")
-    :persistent_term.put(@enabled_key, false)
-  end
-
-  def is_enabled do
-    :persistent_term.get(@enabled_key, true)
-  end
-
-  def do_insert(trace) do
+  defp do_insert(trace) do
     try do
       case is_enabled() do
         true ->
@@ -316,26 +326,26 @@ defmodule SpandexDatadog.ApiServer do
     end
   end
 
-  def complete_exporting(%State{handed_off_table: exporting_table} = state) when exporting_table != :undefined do
+  defp complete_exporting(%State{handed_off_table: exporting_table} = state) when exporting_table != :undefined do
     new_export_table(exporting_table)
     {:next_state, :idle, %State{state | runner_pid: :undefined, handed_off_table: :undefined}}
   end
 
-  def kill_runner(%State{runner_pid: runner_pid} = state) do
+  defp kill_runner(%State{runner_pid: runner_pid} = state) do
     :erlang.unlink(runner_pid)
     :erlang.exit(:runner_pid, :kill)
     %State{state | runner_pid: :undefined, handed_off_table: :undefined}
   end
 
-  def new_export_table(name) do
+  defp new_export_table(name) do
     :ets.new(name, [:public, :named_table, {:write_concurrency, true}, :duplicate_bag])
   end
 
-  def current_table do
+  defp current_table do
     :persistent_term.get(@current_table_key)
   end
 
-  def export_spans(%State{} = state) do
+  defp export_spans(%State{} = state) do
     current_table = current_table()
 
     new_current_table =
@@ -357,7 +367,7 @@ defmodule SpandexDatadog.ApiServer do
 
   # Additional benefit of using a separate process is calls to `register` won't
   # timeout if the actual exporting takes longer than the call timeout
-  def do_send_spans(from_pid, state) do
+  defp do_send_spans(from_pid, state) do
     receive do
       {:"ETS-TRANSFER", table, ^from_pid, :export} ->
         table_name = :ets.rename(table, :current_send_table)
@@ -367,53 +377,19 @@ defmodule SpandexDatadog.ApiServer do
     end
   end
 
-  def completed(from_pid) do
+  defp completed(from_pid) do
     send(from_pid, {:completed, self()})
   end
 
-  def export(trace_tid, state) do
+  defp export(trace_table, state) do
     # don't let a export exception crash us
     # and return true if export failed
     try do
-      Stream.resource(
-        fn -> :ets.select(trace_tid, [{{:"$1", :"$2"}, [], [:"$2"]}], 100) end,
-        fn
-          :"$end_of_table" ->
-            {:halt, :ok}
-
-          {:continue, continuation} ->
-            {[], :ets.select(continuation)}
-
-          {traces, continuation} ->
-            {traces, {:continue, continuation}}
-        end,
-        fn _ -> :ok end
-      )
-      |> Stream.map(&format/1)
-      |> Stream.map(&deep_remove_nils/1)
+      Stream.resource(fn -> stream_start(trace_table) end, &stream_next/1, &stream_after/1)
+      |> Stream.map(&format_trace/1)
       |> Stream.map(&Msgpax.pack_fragment!/1)
-      |> Stream.chunk_while(
-        {[], 0},
-        fn fragment, {acc, curr_length} ->
-          case IO.iodata_length(fragment.data) do
-            length when length > @dd_limit ->
-              {:cont, {acc, curr_length}}
-
-            length when length + curr_length > @dd_limit ->
-              {:cont, acc, {[fragment], length}}
-
-            length ->
-              {:cont, {[fragment | acc], curr_length + length}}
-          end
-        end,
-        fn
-          {[], _} ->
-            {:cont, {[], 0}}
-
-          {acc, _} ->
-            {:cont, Enum.reverse(acc), {[], 0}}
-        end
-      )
+      # One byte overhead for msgpack and one byte for the first entry
+      |> Stream.chunk_while({[], 0, 2}, &stream_chunk/2, &stream_chunk_after/1)
       |> Stream.map(&{length(&1), Msgpax.pack!(&1)})
       |> Stream.map(fn {count, payload} ->
         :telemetry.span([:spandex_datadog, :send_traces], %{events: count}, fn ->
@@ -437,207 +413,37 @@ defmodule SpandexDatadog.ApiServer do
     end
   end
 
+  defp stream_start(trace_table) do
+    :ets.select(trace_table, [{{:"$1", :"$2"}, [], [:"$2"]}], @ets_batch)
+  end
+
+  defp stream_next(:"$end_of_table"), do: {:halt, :ok}
+  defp stream_next({:continue, continuation}), do: {[], :ets.select(continuation)}
+  defp stream_next({traces, continuation}), do: {traces, {:continue, continuation}}
+
+  defp stream_after(_), do: :ok
+
+  defp format_trace(%Trace{spans: spans, priority: priority, baggage: baggage}) do
+    Enum.map(spans, &Formatter.format(&1, priority, baggage))
+  end
+
+  defp stream_chunk(fragment, {acc, cur_len, overhead}) do
+    case IO.iodata_length(fragment.data) do
+      length when length + overhead > @dd_limit ->
+        {:cont, {acc, cur_len}, overhead}
+
+      length when length + overhead + cur_len > @dd_limit ->
+        {:cont, acc, {[fragment], length, 2}}
+
+      length ->
+        {:cont, {[fragment | acc], cur_len + length, overhead + 1}}
+    end
+  end
+
+  defp stream_chunk_after({[], _, _}), do: {:cont, {[], 0, 2}}
+  defp stream_chunk_after({acc, _, _}), do: {:cont, Enum.reverse(acc), {[], 0, 2}}
+
   @spec push(body :: iodata(), headers, State.t()) :: any()
   defp push(body, headers, %State{http: http, host: host, port: port}),
     do: http.put("#{host}:#{port}/v0.3/traces", body, headers)
-
-  def chunk_events(events) do
-    {chunks, _} =
-      Enum.reduce(events, {[[]], 0}, fn event, {[curr_chunk | rest] = payloads, curr_length} ->
-        case IO.iodata_length(event.data) do
-          length when length > @dd_limit ->
-            {payloads, curr_length}
-
-          length when length + curr_length > @dd_limit ->
-            {[[event], curr_chunk | rest], length}
-
-          length ->
-            {[[event | curr_chunk] | rest], curr_length + length}
-        end
-      end)
-
-    case chunks do
-      [[]] ->
-        []
-
-      chunks ->
-        chunks
-        |> Enum.map(&Enum.reverse/1)
-        |> Enum.reverse()
-    end
-  end
-
-  @deprecated "Please use format/3 instead"
-  @spec format(Trace.t()) :: map()
-  def format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
-    Enum.map(spans, fn span -> format(span, priority, baggage) end)
-  end
-
-  @deprecated "Please use format/3 instead"
-  @spec format(Span.t()) :: map()
-  def format(%Span{} = span), do: format(span, 1, [])
-
-  @spec format(Span.t(), integer(), Keyword.t()) :: map()
-  def format(%Span{} = span, priority, _baggage) do
-    %{
-      trace_id: span.trace_id,
-      span_id: span.id,
-      name: span.name,
-      start: span.start,
-      duration: (span.completion_time || SpandexDatadog.Adapter.now()) - span.start,
-      parent_id: span.parent_id,
-      error: error(span.error),
-      resource: span.resource || span.name,
-      service: span.service,
-      type: span.type,
-      meta: meta(span),
-      metrics:
-        metrics(span, %{
-          _sampling_priority_v1: priority
-        })
-    }
-  end
-
-  @spec error(nil | Keyword.t()) :: integer
-  defp error(nil), do: 0
-
-  defp error(keyword) do
-    if Enum.any?(keyword, fn {_, v} -> not is_nil(v) end) do
-      1
-    else
-      0
-    end
-  end
-
-  @spec meta(Span.t()) :: map
-  defp meta(span) do
-    %{}
-    |> add_datadog_meta(span)
-    |> add_error_data(span)
-    |> add_http_data(span)
-    |> add_sql_data(span)
-    |> add_tags(span)
-    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-    |> Enum.into(%{})
-  end
-
-  @spec add_datadog_meta(map, Span.t()) :: map
-  defp add_datadog_meta(meta, %Span{env: nil}), do: meta
-
-  defp add_datadog_meta(meta, %Span{env: env}) do
-    Map.put(meta, :env, env)
-  end
-
-  @spec add_error_data(map, Span.t()) :: map
-  defp add_error_data(meta, %{error: nil}), do: meta
-
-  defp add_error_data(meta, %{error: error}) do
-    meta
-    |> add_error_type(error[:exception])
-    |> add_error_message(error[:exception])
-    |> add_error_stacktrace(error[:stacktrace])
-  end
-
-  @spec add_error_type(map, Exception.t() | nil) :: map
-  defp add_error_type(meta, nil), do: meta
-  defp add_error_type(meta, exception), do: Map.put(meta, "error.type", exception.__struct__)
-
-  @spec add_error_message(map, Exception.t() | nil) :: map
-  defp add_error_message(meta, nil), do: meta
-
-  defp add_error_message(meta, exception),
-    do: Map.put(meta, "error.msg", Exception.message(exception))
-
-  @spec add_error_stacktrace(map, list | nil) :: map
-  defp add_error_stacktrace(meta, nil), do: meta
-
-  defp add_error_stacktrace(meta, stacktrace),
-    do: Map.put(meta, "error.stack", Exception.format_stacktrace(stacktrace))
-
-  @spec add_http_data(map, Span.t()) :: map
-  defp add_http_data(meta, %{http: nil}), do: meta
-
-  defp add_http_data(meta, %{http: http}) do
-    status_code =
-      if http[:status_code] do
-        to_string(http[:status_code])
-      end
-
-    meta
-    |> Map.put("http.url", http[:url])
-    |> Map.put("http.status_code", status_code)
-    |> Map.put("http.method", http[:method])
-  end
-
-  @spec add_sql_data(map, Span.t()) :: map
-  defp add_sql_data(meta, %{sql_query: nil}), do: meta
-
-  defp add_sql_data(meta, %{sql_query: sql}) do
-    meta
-    |> Map.put("sql.query", sql[:query])
-    |> Map.put("sql.rows", sql[:rows])
-    |> Map.put("sql.db", sql[:db])
-  end
-
-  @spec add_tags(map, Span.t()) :: map
-  defp add_tags(meta, %{tags: nil}), do: meta
-
-  defp add_tags(meta, %{tags: tags}) do
-    tags = tags |> Keyword.delete(:analytics_event)
-
-    Map.merge(
-      meta,
-      tags
-      |> Enum.map(fn {k, v} -> {k, term_to_string(v)} end)
-      |> Enum.into(%{})
-    )
-  end
-
-  @spec metrics(Span.t(), map) :: map
-  defp metrics(span, initial_value = %{}) do
-    initial_value
-    |> add_metrics(span)
-    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-    |> Enum.into(%{})
-  end
-
-  @spec add_metrics(map, Span.t()) :: map
-  defp add_metrics(metrics, %{tags: nil}), do: metrics
-
-  defp add_metrics(metrics, %{tags: tags}) do
-    with analytics_event <- tags |> Keyword.get(:analytics_event),
-         true <- analytics_event != nil do
-      Map.merge(
-        metrics,
-        %{"_dd1.sr.eausr" => 1}
-      )
-    else
-      _ ->
-        metrics
-    end
-  end
-
-  @spec deep_remove_nils(term) :: term
-  defp deep_remove_nils(term) when is_map(term) do
-    term
-    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-    |> Enum.map(fn {k, v} -> {k, deep_remove_nils(v)} end)
-    |> Enum.into(%{})
-  end
-
-  defp deep_remove_nils(term) when is_list(term) do
-    if Keyword.keyword?(term) do
-      term
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-      |> Enum.map(fn {k, v} -> {k, deep_remove_nils(v)} end)
-    else
-      Enum.map(term, &deep_remove_nils/1)
-    end
-  end
-
-  defp deep_remove_nils(term), do: term
-
-  defp term_to_string(term) when is_binary(term), do: term
-  defp term_to_string(term) when is_atom(term), do: term
-  defp term_to_string(term), do: inspect(term)
 end
