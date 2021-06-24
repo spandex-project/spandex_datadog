@@ -75,9 +75,9 @@ defmodule SpandexDatadog.ApiServer do
                        verbose?: false,
                        api_adapter: SpandexDatadog.ApiServer,
                        max_queue_size: 20 * 1024 * 1024,
-                       scheduled_delay_ms: :timer.seconds(5),
-                       export_timeout_ms: :timer.minutes(5),
-                       check_table_size_ms: :timer.seconds(1)
+                       scheduled_delay_ms: :timer.seconds(2),
+                       export_timeout_ms: :timer.minutes(1),
+                       check_table_size_ms: 500
                      ],
                      required: [:http],
                      describe: [
@@ -375,25 +375,59 @@ defmodule SpandexDatadog.ApiServer do
     # don't let a export exception crash us
     # and return true if export failed
     try do
-      trace_tid
-      |> :ets.select([{{:"$1", :"$2"}, [], [:"$2"]}])
-      |> Enum.map(&format/1)
-      |> Enum.map(&deep_remove_nils/1)
-      |> Enum.map(&Msgpax.pack_fragment!/1)
-      |> chunk_events()
-      |> Enum.each(fn chunk ->
-        len = length(chunk)
+      Stream.resource(
+        fn -> :ets.select(trace_tid, [{{:"$1", :"$2"}, [], [:"$2"]}], 100) end,
+        fn
+          :"$end_of_table" ->
+            {:halt, :ok}
 
-        :telemetry.span([:spandex_datadog, :send_traces], %{events: len}, fn ->
-          headers = @headers ++ [{"X-Datadog-Trace-Count", len}]
-          payload = Msgpax.pack!(chunk)
+          {:continue, continuation} ->
+            {[], :ets.select(continuation)}
+
+          {traces, continuation} ->
+            {traces, {:continue, continuation}}
+        end,
+        fn _ -> :ok end
+      )
+      |> Stream.map(&format/1)
+      |> Stream.map(&deep_remove_nils/1)
+      |> Stream.map(&Msgpax.pack_fragment!/1)
+      |> Stream.chunk_while(
+        {[], 0},
+        fn fragment, {acc, curr_length} ->
+          case IO.iodata_length(fragment.data) do
+            length when length > @dd_limit ->
+              {:cont, {acc, curr_length}}
+
+            length when length + curr_length > @dd_limit ->
+              {:cont, acc, {[fragment], length}}
+
+            length ->
+              {:cont, {[fragment | acc], curr_length + length}}
+          end
+        end,
+        fn
+          {[], _} ->
+            {:cont, {[], 0}}
+
+          {acc, _} ->
+            {:cont, Enum.reverse(acc), {[], 0}}
+        end
+      )
+      |> Stream.map(&{length(&1), Msgpax.pack!(&1)})
+      |> Stream.map(fn {count, payload} ->
+        :telemetry.span([:spandex_datadog, :send_traces], %{events: count}, fn ->
+          headers = @headers ++ [{"X-Datadog-Trace-Count", count}]
           res = push(payload, headers, state)
 
           if state.verbose?, do: Logger.debug("push_result: #{inspect(res)}")
 
-          {true, %{events: len}}
+          {true, %{events: count}}
         end)
+
+        :ok
       end)
+      |> Stream.run()
 
       true
     catch
