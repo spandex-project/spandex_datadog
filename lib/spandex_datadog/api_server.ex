@@ -333,7 +333,7 @@ defmodule SpandexDatadog.ApiServer do
 
   defp kill_runner(%State{runner_pid: runner_pid} = state) do
     :erlang.unlink(runner_pid)
-    :erlang.exit(:runner_pid, :kill)
+    :erlang.exit(runner_pid, :kill)
     %State{state | runner_pid: :undefined, handed_off_table: :undefined}
   end
 
