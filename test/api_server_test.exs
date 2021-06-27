@@ -1,8 +1,6 @@
 defmodule SpandexDatadog.ApiServerTest do
   use ExUnit.Case, async: false
 
-  import ExUnit.CaptureLog
-
   alias Spandex.{
     Span,
     Trace
@@ -12,14 +10,28 @@ defmodule SpandexDatadog.ApiServerTest do
 
   defmodule TestOkApiServer do
     def put(url, body, headers) do
-      send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
+      pid = :persistent_term.get(:test_pid)
+
+      data =
+        body
+        |> Msgpax.unpack!()
+        |> hd()
+
+      send(pid, {:put_datadog_spans, data, url, headers})
       {:ok, %HTTPoison.Response{status_code: 200}}
     end
   end
 
   defmodule TestErrorApiServer do
     def put(url, body, headers) do
-      send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
+      pid = :persistent_term.get(:test_pid)
+
+      data =
+        body
+        |> Msgpax.unpack!()
+        |> hd()
+
+      send(pid, {:put_datadog_spans, data, url, headers})
       {:error, %HTTPoison.Error{id: :foo, reason: :bar}}
     end
   end
@@ -31,14 +43,7 @@ defmodule SpandexDatadog.ApiServerTest do
     end
   end
 
-  defmodule TelemetryRecorderPDict do
-    def handle_event(event, measurements, metadata, _cfg) do
-      Process.put(event, {measurements, metadata})
-    end
-  end
-
   setup_all do
-    {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
     trace_id = 4_743_028_846_331_200_905
 
     {:ok, span_1} =
@@ -84,86 +89,73 @@ defmodule SpandexDatadog.ApiServerTest do
         trace: trace,
         url: "localhost:8126/v0.3/traces",
         state: %ApiServer.State{
-          asynchronous_send?: false,
           host: "localhost",
           port: "8126",
           http: TestOkApiServer,
-          verbose?: false,
-          waiting_traces: [],
-          batch_size: 1,
-          agent_pid: agent_pid
+          verbose?: false
         }
       ]
     }
   end
 
   describe "ApiServer.send_trace/2" do
-    test "executes telemetry on success", %{trace: trace} do
+    test "executes telemetry on success", %{test: test, trace: trace} do
+      self = self()
+
+      :persistent_term.put(:test_pid, self)
+
       :telemetry.attach_many(
-        "log-response-handler",
+        "#{test}",
         [
-          [:spandex_datadog, :send_trace, :start],
-          [:spandex_datadog, :send_trace, :stop],
-          [:spandex_datadog, :send_trace, :exception]
+          [:spandex_datadog, :insert_trace, :start],
+          [:spandex_datadog, :insert_trace, :stop],
+          [:spandex_datadog, :insert_trace, :exception]
         ],
-        &TelemetryRecorderPDict.handle_event/4,
+        fn name, measurements, metadata, _ ->
+          send(self, {:telemetry_event, name, measurements, metadata})
+        end,
         nil
       )
 
-      ApiServer.start_link(http: TestOkApiServer)
+      start_supervised!({ApiServer, http: TestOkApiServer})
 
       ApiServer.send_trace(trace)
 
-      {start_measurements, start_metadata} = Process.get([:spandex_datadog, :send_trace, :start])
+      assert_receive {:telemetry_event, [:spandex_datadog, :insert_trace, :start], start_measurements, start_metadata},
+                     5000
+
       assert start_measurements[:system_time]
       assert trace == start_metadata[:trace]
 
-      {stop_measurements, stop_metadata} = Process.get([:spandex_datadog, :send_trace, :stop])
+      assert_receive {:telemetry_event, [:spandex_datadog, :insert_trace, :stop], stop_measurements, stop_metadata},
+                     5000
+
       assert stop_measurements[:duration]
       assert trace == stop_metadata[:trace]
 
-      refute Process.get([:spandex_datadog, :send_trace, :exception])
+      refute_receive {:telemetry_event, [:spandex_datadog, :insert_trace, :exception], _}
     end
 
-    test "executes telemetry on exception", %{trace: trace} do
+    test "sends the trace", %{test: test, trace: trace, url: url} do
+      self = self()
+      :persistent_term.put(:test_pid, self())
+
       :telemetry.attach_many(
-        "log-response-handler",
+        "#{test}",
         [
-          [:spandex_datadog, :send_trace, :start],
-          [:spandex_datadog, :send_trace, :stop],
-          [:spandex_datadog, :send_trace, :exception]
+          [:spandex_datadog, :send_traces, :start],
+          [:spandex_datadog, :send_traces, :stop],
+          [:spandex_datadog, :send_traces, :exception]
         ],
-        &TelemetryRecorderPDict.handle_event/4,
+        fn name, measurements, metadata, _ ->
+          send(self, {:telemetry_event, name, measurements, metadata})
+        end,
         nil
       )
 
-      ApiServer.start_link(http: TestSlowApiServer, batch_size: 0, sync_threshold: 0)
+      start_supervised!({ApiServer, http: TestOkApiServer, verbose?: true, send_interval: 50})
 
-      catch_exit(ApiServer.send_trace(trace, timeout: 1))
-
-      {start_measurements, start_metadata} = Process.get([:spandex_datadog, :send_trace, :start])
-      assert start_measurements[:system_time]
-      assert trace == start_metadata[:trace]
-
-      refute Process.get([:spandex_datadog, :send_trace, :stop])
-
-      {exception_measurements, exception_metadata} = Process.get([:spandex_datadog, :send_trace, :exception])
-      assert exception_measurements[:duration]
-      assert trace == start_metadata[:trace]
-      assert :exit == exception_metadata[:kind]
-      assert nil == exception_metadata[:error]
-      assert is_list(exception_metadata[:stacktrace])
-    end
-  end
-
-  describe "ApiServer.handle_call/3 - :send_trace" do
-    test "doesn't log anything when verbose?: false", %{trace: trace, state: state, url: url} do
-      log =
-        capture_log(fn ->
-          ApiServer.handle_call({:send_trace, trace}, self(), state)
-        end)
-
-      assert log == ""
+      ApiServer.send_trace(trace)
 
       formatted = [
         %{
@@ -227,27 +219,22 @@ defmodule SpandexDatadog.ApiServerTest do
         {"X-Datadog-Trace-Count", 1}
       ]
 
-      assert_received {:put_datadog_spans, ^formatted, ^url, ^headers}
+      assert_receive {:put_datadog_spans, ^formatted, ^url, ^headers}
+
+      assert_receive {:telemetry_event, [:spandex_datadog, :send_traces, :start], start_measurements, _metadata}
+      assert start_measurements[:system_time]
+
+      assert_receive {:telemetry_event, [:spandex_datadog, :send_traces, :stop], stop_measurements, _metadata}
+      assert stop_measurements[:duration]
+
+      refute_receive {:telemetry_event, [:spandex_datadog, :send_traces, :exception], _}
     end
 
-    test "doesn't care about the response result", %{trace: trace, state: state, url: url} do
-      state =
-        state
-        |> Map.put(:verbose?, true)
-        |> Map.put(:http, TestErrorApiServer)
+    test "doesn't care about the response result", %{trace: trace, url: url} do
+      :persistent_term.put(:test_pid, self())
+      start_supervised!({ApiServer, http: TestErrorApiServer, verbose?: true, send_interval: 50})
 
-      [enqueue, processing, received_spans, response] =
-        capture_log(fn ->
-          {:reply, :ok, _} = ApiServer.handle_call({:send_trace, trace}, self(), state)
-        end)
-        |> String.split("\n")
-        |> Enum.reject(fn s -> s == "" end)
-
-      assert enqueue =~ ~r/Adding trace to stack with 3 spans/
-
-      assert processing =~ ~r/Sending 1 traces, 3 spans/
-
-      assert received_spans =~ ~r/Trace: \[%Spandex.Trace{/
+      ApiServer.send_trace(trace)
 
       formatted = [
         %{
@@ -306,8 +293,12 @@ defmodule SpandexDatadog.ApiServerTest do
         }
       ]
 
-      assert response =~ ~r/Trace response: {:error, %HTTPoison.Error{id: :foo, reason: :bar}}/
-      assert_received {:put_datadog_spans, ^formatted, ^url, _}
+      headers = [
+        {"Content-Type", "application/msgpack"},
+        {"X-Datadog-Trace-Count", 1}
+      ]
+
+      assert_receive {:put_datadog_spans, ^formatted, ^url, ^headers}
     end
   end
 end
