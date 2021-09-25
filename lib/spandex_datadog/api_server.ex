@@ -6,12 +6,12 @@ defmodule SpandexDatadog.ApiServer do
 
   The following options can be passed to `SpandexDatadog.ApiServer.start_link/1`:
 
-  * `:http` - The HTTP module to use for sending spans to the agent. Currently only HTTPoison has been tested. Required.
-  * `:host` - The host the agent can be reached at. Defaults to "localhost".
-  * `:port` - The port to use when sending traces to the agent. Defaults to 8126.
-  * `:verbose?` - Only to be used for debugging: All finished traces will be logged.
-  * `:batch_size` - The number of traces that should be sent in a single batch. Defaults to 10.
-  * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to 20.
+  * `:http` - The HTTP module to use for sending spans to the agent. Defaults to `HTTPoison`.
+  * `:host` - The host the agent can be reached at. Defaults to `"localhost"`.
+  * `:port` - The port to use when sending traces to the agent. Defaults to `8126`.
+  * `:verbose?` - Only to be used for debugging: All finished traces will be logged. Defaults to `false`
+  * `:batch_size` - The number of traces that should be sent in a single batch. Defaults to `10`.
+  * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to `20`.
   """
 
   use GenServer
@@ -48,6 +48,7 @@ defmodule SpandexDatadog.ApiServer do
 
   @default_opts [
     host: "localhost",
+    http: HTTPoison,
     port: 8126,
     verbose?: false,
     batch_size: 10,
@@ -59,7 +60,7 @@ defmodule SpandexDatadog.ApiServer do
   Starts genserver with given options.
   """
   @spec start_link(opts :: Keyword.t()) :: GenServer.on_start()
-  def start_link(opts) do
+  def start_link(opts \\ []) do
     opts = Keyword.merge(@default_opts, opts)
 
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
