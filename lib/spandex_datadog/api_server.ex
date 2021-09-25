@@ -1,17 +1,6 @@
 defmodule SpandexDatadog.ApiServer do
   @moduledoc """
   Implements worker for sending spans to datadog as GenServer in order to send traces async.
-
-  ## Options
-
-  The following options can be passed to `SpandexDatadog.ApiServer.start_link/1`:
-
-  * `:http` - The HTTP module to use for sending spans to the agent. Defaults to `HTTPoison`.
-  * `:host` - The host the agent can be reached at. Defaults to `"localhost"`.
-  * `:port` - The port to use when sending traces to the agent. Defaults to `8126`.
-  * `:verbose?` - Only to be used for debugging: All finished traces will be logged. Defaults to `false`
-  * `:batch_size` - The number of traces that should be sent in a single batch. Defaults to `10`.
-  * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to `20`.
   """
 
   use GenServer
@@ -57,7 +46,16 @@ defmodule SpandexDatadog.ApiServer do
   ]
 
   @doc """
-  Starts genserver with given options.
+  Starts the ApiServer with given options.
+
+  ## Options
+
+  * `:http` - The HTTP module to use for sending spans to the agent. Defaults to `HTTPoison`.
+  * `:host` - The host the agent can be reached at. Defaults to `"localhost"`.
+  * `:port` - The port to use when sending traces to the agent. Defaults to `8126`.
+  * `:verbose?` - Only to be used for debugging: All finished traces will be logged. Defaults to `false`
+  * `:batch_size` - The number of traces that should be sent in a single batch. Defaults to `10`.
+  * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to `20`.
   """
   @spec start_link(opts :: Keyword.t()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -66,9 +64,7 @@ defmodule SpandexDatadog.ApiServer do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc """
-  Builds server state.
-  """
+  @doc false
   @spec init(opts :: Keyword.t()) :: {:ok, State.t()}
   def init(opts) do
     {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
@@ -137,12 +133,14 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @deprecated "Please use format/3 instead"
+  @doc false
   @spec format(Trace.t()) :: map()
   def format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
     Enum.map(spans, fn span -> format(span, priority, baggage) end)
   end
 
   @deprecated "Please use format/3 instead"
+  @doc false
   @spec format(Span.t()) :: map()
   def format(%Span{} = span), do: format(span, 1, [])
 
