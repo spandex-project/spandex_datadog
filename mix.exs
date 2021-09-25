@@ -7,13 +7,14 @@ defmodule SpandexDatadog.MixProject do
   def project do
     [
       app: :spandex_datadog,
-      version: @version,
-      elixir: "~> 1.6",
-      start_permanent: Mix.env() == :prod,
-      elixirc_paths: elixirc_paths(Mix.env()),
-      docs: docs(),
       deps: deps(),
-      package: package()
+      description: "A datadog API adapter for spandex.",
+      docs: docs(),
+      elixir: "~> 1.6",
+      elixirc_paths: elixirc_paths(Mix.env()),
+      package: package(),
+      start_permanent: Mix.env() == :prod,
+      version: @version
     ]
   end
 
@@ -25,13 +26,13 @@ defmodule SpandexDatadog.MixProject do
 
   defp package do
     [
-      description: "A datadog API adapter for spandex.",
       name: :spandex_datadog,
-      maintainers: ["Zachary Daniel", "Greg Mefford"],
+      maintainers: ["Greg Mefford"],
       licenses: ["MIT"],
       links: %{
         "Changelog" => "https://hexdocs.pm/spandex_datadog/changelog.html",
-        "GitHub" => @source_url
+        "GitHub" => @source_url,
+        "Sponsor" => "https://github.com/sponsors/GregMefford"
       }
     ]
   end
@@ -53,10 +54,9 @@ defmodule SpandexDatadog.MixProject do
       {:msgpax, "~> 2.2.1"},
       {:spandex, "~> 3.0"},
       {:telemetry, "~> 0.4"},
+      # Dev- and test-only deps
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:git_ops, "~> 2.0", only: [:dev]},
-      {:httpoison, "~> 0.13 or ~> 1.0", only: :test},
-      {:inch_ex, "~> 2.0", only: [:dev, :test]}
+      {:httpoison, "~> 0.13 or ~> 1.0", only: :test}
     ]
   end
 end

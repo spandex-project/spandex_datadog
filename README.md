@@ -1,11 +1,8 @@
 # SpandexDatadog
 
-[![CircleCI](https://circleci.com/gh/spandex-project/spandex_datadog.svg?style=svg)](https://circleci.com/gh/spandex-project/spandex_datadog)
-[![Inline docs](http://inch-ci.org/github/spandex-project/spandex_datadog.svg)](http://inch-ci.org/github/spandex-project/spandex_datadog)
-[![Coverage Status](https://coveralls.io/repos/github/spandex-project/spandex_datadog/badge.svg)](https://coveralls.io/github/spandex-project/spandex_datadog)
-[![Module Version](https://img.shields.io/hexpm/v/spandex_datadog.svg)](https://hex.pm/packages/spandex_datadog)
+[![Package Version](https://img.shields.io/hexpm/v/spandex_datadog.svg)](https://hex.pm/packages/spandex_datadog)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/spandex_datadog/)
-[![Total Download](https://img.shields.io/hexpm/dt/spandex_datadog.svg)](https://hex.pm/packages/spandex_datadog)
+[![Downloads](https://img.shields.io/hexpm/dt/spandex_datadog.svg)](https://hex.pm/packages/spandex_datadog)
 [![License](https://img.shields.io/hexpm/l/spandex_datadog.svg)](https://github.com/spandex-project/spandex_datadog/blob/master/LICENSE)
 [![Last Updated](https://img.shields.io/github/last-commit/spandex-project/spandex_datadog.svg)](https://github.com/spandex-project/spandex_datadog/commits/master)
 
@@ -155,6 +152,6 @@ performant than purely asynchronous strategies (and much more predictable).
 
 ## Copyright and License
 
-Copyright (c) 2018 Zachary Daniel & Greg Mefford
+Copyright (c) 2021 Zachary Daniel & Greg Mefford
 
 Released under the MIT License, which can be found in the repository in [`LICENSE`](https://github.com/spandex-project/spandex_datadog/blob/master/LICENSE).
