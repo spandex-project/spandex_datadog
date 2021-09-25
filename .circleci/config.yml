@@ -6,6 +6,8 @@ jobs:
   build:
     docker:
       - image: cimg/elixir:1.11
+        environment:
+          MIX_ENV: test
     working_directory: ~/spandex_datadog
     steps:
       - checkout
