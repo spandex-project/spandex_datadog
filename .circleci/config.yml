@@ -5,21 +5,15 @@ version: 2
 jobs:
   build:
     docker:
-      # specify the version here
-      - image: circleci/elixir:1.11
-
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
-
+      - image: cimg/elixir:1.11
+        environment:
+          MIX_ENV: test
     working_directory: ~/spandex_datadog
     steps:
       - checkout
-
-      # specify any bash command here prefixed with `run: `
       - run: mix local.hex --force
       - run: mix local.rebar --force
+      - run: mix format --check-formatted
       - run: mix deps.get
       - run: mix compile --warnings-as-errors
       - run: mix test

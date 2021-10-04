@@ -35,56 +35,38 @@ defmodule SpandexDatadog.ApiServer do
 
   @headers [{"Content-Type", "application/msgpack"}]
 
-  @start_link_opts Optimal.schema(
-                     opts: [
-                       host: :string,
-                       port: [:integer, :string],
-                       verbose?: :boolean,
-                       http: :atom,
-                       batch_size: :integer,
-                       sync_threshold: :integer,
-                       name: :atom,
-                       api_adapter: :atom
-                     ],
-                     defaults: [
-                       host: "localhost",
-                       port: 8126,
-                       verbose?: false,
-                       batch_size: 10,
-                       sync_threshold: 20,
-                       name: __MODULE__,
-                       api_adapter: SpandexDatadog.ApiServer
-                     ],
-                     required: [:http],
-                     describe: [
-                       verbose?: "Only to be used for debugging: All finished traces will be logged",
-                       host: "The host the agent can be reached at",
-                       port: "The port to use when sending traces to the agent",
-                       batch_size: "The number of traces that should be sent in a single batch",
-                       sync_threshold:
-                         "The maximum number of processes that may be sending traces at any one time. This adds backpressure",
-                       http:
-                         "The HTTP module to use for sending spans to the agent. Currently only HTTPoison has been tested",
-                       name: "What name the GenServer should have. Currently only used for testing",
-                       api_adapter: "Which api adapter to use. Currently only used for testing"
-                     ]
-                   )
+  @default_opts [
+    host: "localhost",
+    http: HTTPoison,
+    port: 8126,
+    verbose?: false,
+    batch_size: 10,
+    sync_threshold: 20,
+    name: __MODULE__,
+    api_adapter: SpandexDatadog.ApiServer
+  ]
 
   @doc """
-  Starts genserver with given options.
+  Starts the ApiServer with given options.
 
-  #{Optimal.Doc.document(@start_link_opts)}
+  ## Options
+
+  * `:http` - The HTTP module to use for sending spans to the agent. Defaults to `HTTPoison`.
+  * `:host` - The host the agent can be reached at. Defaults to `"localhost"`.
+  * `:port` - The port to use when sending traces to the agent. Defaults to `8126`.
+  * `:verbose?` - Only to be used for debugging: All finished traces will be logged. Defaults to `false`
+  * `:batch_size` - The number of traces that should be sent in a single batch. Defaults to `10`.
+  * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to `20`.
+  * `:name` - The name the GenServer should have. Currently only used for testing. Defaults to `SpandexDatadog.ApiServer`
   """
   @spec start_link(opts :: Keyword.t()) :: GenServer.on_start()
-  def start_link(opts) do
-    opts = Optimal.validate!(opts, @start_link_opts)
+  def start_link(opts \\ []) do
+    opts = Keyword.merge(@default_opts, opts)
 
     GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, __MODULE__))
   end
 
-  @doc """
-  Builds server state.
-  """
+  @doc false
   @spec init(opts :: Keyword.t()) :: {:ok, State.t()}
   def init(opts) do
     Process.flag(:trap_exit, true)
@@ -179,12 +161,14 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @deprecated "Please use format/3 instead"
+  @doc false
   @spec format(Trace.t()) :: map()
   def format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
     Enum.map(spans, fn span -> format(span, priority, baggage) end)
   end
 
   @deprecated "Please use format/3 instead"
+  @doc false
   @spec format(Span.t()) :: map()
   def format(%Span{} = span), do: format(span, 1, [])
 
@@ -298,8 +282,8 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @spec add_error_type(map, Exception.t() | nil) :: map
-  defp add_error_type(meta, nil), do: meta
-  defp add_error_type(meta, exception), do: Map.put(meta, "error.type", exception.__struct__)
+  defp add_error_type(meta, %struct{}), do: Map.put(meta, "error.type", struct)
+  defp add_error_type(meta, _), do: meta
 
   @spec add_error_message(map, Exception.t() | nil) :: map
   defp add_error_message(meta, nil), do: meta

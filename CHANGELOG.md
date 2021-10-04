@@ -1,4 +1,4 @@
-# Change Log
+# Changelog
 
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](Https://conventionalcommits.org) for commit guidelines.
@@ -20,7 +20,7 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 
 
-## [0.6.0](https://github.com/spandex-project/spandex_datadog/compare/0.5.0...0.6.0) (2020-4-23)
+## [0.6.0](https://github.com/spandex-project/spandex_datadog/compare/0.5.0...0.6.0) (2020-04-23)
 
 
 
@@ -47,7 +47,7 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 * Ensure tags are converted to strings (#16)
 
-## [0.4.0](https://github.com/spandex-project/spandex_datadog/compare/0.3.1...0.4.0) (2019-2-1)
+## [0.4.0](https://github.com/spandex-project/spandex_datadog/compare/0.3.1...0.4.0) (2019-02-01)
 
 
 
@@ -56,13 +56,13 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 * support elixir 1.8 via msgpax bump
 
-## [0.3.1](https://github.com/spandex-project/spandex_datadog/compare/0.3.1...0.3.1) (2018-10-19)
+## [0.3.1](https://github.com/spandex-project/spandex_datadog/compare/0.3.0...0.3.1) (2018-10-19)
 
 Initial release using automated changelog management
 
 # Changelog prior to automated change log management
 
-## [0.3.0]
+## [0.3.0] (2018-09-16)
 
 [0.3.0]: https://github.com/spandex-project/spandex_datadog/compare/v0.3.0...v0.2.0
 
@@ -70,7 +70,7 @@ Initial release using automated changelog management
 - `SpandexDatadog.Adapter.inject_context/3` added to support the new version of
   the `Spandex.Adapter` behaviour.
 
-## [0.2.0]
+## [0.2.0] (2018-08-31)
 
 [0.2.0]: https://github.com/spandex-project/spandex_datadog/compare/v0.2.0...v0.1.0
 
@@ -94,7 +94,7 @@ Initial release using automated changelog management
 - `SpandexDatadog.ApiServer.send_spans/2` is deprecated in favor of
   `SpandexDatadog.ApiServer.send_trace/2`.
 
-## [0.1.0]
+## [0.1.0] (2018-08-23)
 
 ### Added
 - Initial release of the `spandex_datadog` library separately from the
