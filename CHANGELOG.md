@@ -5,6 +5,16 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [1.2.0](https://github.com/spandex-project/spandex_datadog/compare/1.1.0...1.2.0) (2021-10-23)
+
+### Features:
+
+* Handle structs explicitly when adding error type [#37](https://github.com/spandex-project/spandex_datadog/pull/37)
+* Misc doc generation changes [#40](https://github.com/spandex-project/spandex_datadog/pull/40)
+* Remove usage of the transitive dependency Optimal [#33](https://github.com/spandex-project/spandex_datadog/pull/33)
+* Update min version of telemetry [#43](https://github.com/spandex-project/spandex_datadog/pull/43)
+* add container id to ApiServer.State and send in header [#38](https://github.com/spandex-project/spandex_datadog/pull/38)
+
 ## [1.1.0](https://github.com/spandex-project/spandex_datadog/compare/1.0.0...1.1.0) (2021-01-19)
 
 ### Features:
