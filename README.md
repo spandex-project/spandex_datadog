@@ -16,7 +16,7 @@ dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:spandex_datadog, "~> 1.1"}
+    {:spandex_datadog, "~> 1.2"}
   ]
 end
 ```
@@ -25,7 +25,12 @@ To start the datadog adapter, add a worker to your application's supervisor
 
 ```elixir
 # Example configuration
-opts =
+
+# Note: You should put ApiServer before any other children in the list that
+# might try to send traces before the ApiServer has started up, for example
+# Ecto.Repo and Phoenix.Endpoint
+
+spandex_opts =
   [
     host: System.get_env("DATADOG_HOST") || "localhost",
     port: System.get_env("DATADOG_PORT") || 8126,
@@ -34,9 +39,16 @@ opts =
     http: HTTPoison
   ]
 
-# in your supervision tree
+children = [
+  # ...
+  {SpandexDatadog.ApiServer, spandex_opts},
+  MyApp.Repo,
+  MyAppWeb.Endpoint,
+  # ...
+]
 
-worker(SpandexDatadog.ApiServer, [opts])
+opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+Supvervisor.start_link(children, opts)
 ```
 
 ## Distributed Tracing
