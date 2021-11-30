@@ -1,22 +1,22 @@
 # SpandexDatadog
 
-[![CircleCI](https://circleci.com/gh/spandex-project/spandex_datadog.svg?style=svg)](https://circleci.com/gh/spandex-project/spandex_datadog)
-[![Inline docs](http://inch-ci.org/github/spandex-project/spandex_datadog.svg)](http://inch-ci.org/github/spandex-project/spandex_datadog)
-[![Coverage Status](https://coveralls.io/repos/github/spandex-project/spandex_datadog/badge.svg)](https://coveralls.io/github/spandex-project/spandex_datadog)
-[![Hex pm](http://img.shields.io/hexpm/v/spandex_datadog.svg?style=flat)](https://hex.pm/packages/spandex_datadog)
-[![SourceLevel](https://sourcelevel.io/github/spandex-project/spandex_datadog.svg)](https://sourcelevel.io/github/spandex-project/spandex_datadog)
+[![Package Version](https://img.shields.io/hexpm/v/spandex_datadog.svg)](https://hex.pm/packages/spandex_datadog)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/spandex_datadog/)
+[![Downloads](https://img.shields.io/hexpm/dt/spandex_datadog.svg)](https://hex.pm/packages/spandex_datadog)
+[![License](https://img.shields.io/hexpm/l/spandex_datadog.svg)](https://github.com/spandex-project/spandex_datadog/blob/master/LICENSE)
+[![Last Updated](https://img.shields.io/github/last-commit/spandex-project/spandex_datadog.svg)](https://github.com/spandex-project/spandex_datadog/commits/master)
 
-A datadog adapter for the `spandex` library.
+A datadog adapter for the `:spandex` library.
 
 ## Installation
 
-The package can be installed by adding `spandex_datadog` to your list of
+The package can be installed by adding `:spandex_datadog` to your list of
 dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:spandex_datadog, "~> 1.1"}
+    {:spandex_datadog, "~> 1.2"}
   ]
 end
 ```
@@ -25,7 +25,12 @@ To start the datadog adapter, add a worker to your application's supervisor
 
 ```elixir
 # Example configuration
-opts =
+
+# Note: You should put ApiServer before any other children in the list that
+# might try to send traces before the ApiServer has started up, for example
+# Ecto.Repo and Phoenix.Endpoint
+
+spandex_opts =
   [
     host: System.get_env("DATADOG_HOST") || "localhost",
     port: System.get_env("DATADOG_PORT") || 8126,
@@ -34,9 +39,16 @@ opts =
     http: HTTPoison
   ]
 
-# in your supervision tree
+children = [
+  # ...
+  {SpandexDatadog.ApiServer, spandex_opts},
+  MyApp.Repo,
+  MyAppWeb.Endpoint,
+  # ...
+]
 
-worker(SpandexDatadog.ApiServer, [opts])
+opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+Supvervisor.start_link(children, opts)
 ```
 
 ## Distributed Tracing
@@ -148,3 +160,10 @@ processed concurrently before trace calls become synchronous.
 This concept of backpressure is very important, and strategies
 for switching to synchronous operation are often surprisingly far more
 performant than purely asynchronous strategies (and much more predictable).
+
+
+## Copyright and License
+
+Copyright (c) 2021 Zachary Daniel & Greg Mefford
+
+Released under the MIT License, which can be found in the repository in [`LICENSE`](https://github.com/spandex-project/spandex_datadog/blob/master/LICENSE).

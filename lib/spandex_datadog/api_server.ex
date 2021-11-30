@@ -26,7 +26,8 @@ defmodule SpandexDatadog.ApiServer do
       :waiting_traces,
       :batch_size,
       :sync_threshold,
-      :agent_pid
+      :agent_pid,
+      :container_id
     ]
   end
 
@@ -35,53 +36,36 @@ defmodule SpandexDatadog.ApiServer do
 
   @headers [{"Content-Type", "application/msgpack"}]
 
-  @start_link_opts Optimal.schema(
-                     opts: [
-                       host: :string,
-                       port: [:integer, :string],
-                       verbose?: :boolean,
-                       http: :atom,
-                       batch_size: :integer,
-                       sync_threshold: :integer,
-                       api_adapter: :atom
-                     ],
-                     defaults: [
-                       host: "localhost",
-                       port: 8126,
-                       verbose?: false,
-                       batch_size: 10,
-                       sync_threshold: 20,
-                       api_adapter: SpandexDatadog.ApiServer
-                     ],
-                     required: [:http],
-                     describe: [
-                       verbose?: "Only to be used for debugging: All finished traces will be logged",
-                       host: "The host the agent can be reached at",
-                       port: "The port to use when sending traces to the agent",
-                       batch_size: "The number of traces that should be sent in a single batch",
-                       sync_threshold:
-                         "The maximum number of processes that may be sending traces at any one time. This adds backpressure",
-                       http:
-                         "The HTTP module to use for sending spans to the agent. Currently only HTTPoison has been tested",
-                       api_adapter: "Which api adapter to use. Currently only used for testing"
-                     ]
-                   )
+  @default_opts [
+    host: "localhost",
+    http: HTTPoison,
+    port: 8126,
+    verbose?: false,
+    batch_size: 10,
+    sync_threshold: 20,
+    api_adapter: SpandexDatadog.ApiServer
+  ]
 
   @doc """
-  Starts genserver with given options.
+  Starts the ApiServer with given options.
 
-  #{Optimal.Doc.document(@start_link_opts)}
+  ## Options
+
+  * `:http` - The HTTP module to use for sending spans to the agent. Defaults to `HTTPoison`.
+  * `:host` - The host the agent can be reached at. Defaults to `"localhost"`.
+  * `:port` - The port to use when sending traces to the agent. Defaults to `8126`.
+  * `:verbose?` - Only to be used for debugging: All finished traces will be logged. Defaults to `false`
+  * `:batch_size` - The number of traces that should be sent in a single batch. Defaults to `10`.
+  * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to `20`.
   """
   @spec start_link(opts :: Keyword.t()) :: GenServer.on_start()
-  def start_link(opts) do
-    opts = Optimal.validate!(opts, @start_link_opts)
+  def start_link(opts \\ []) do
+    opts = Keyword.merge(@default_opts, opts)
 
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc """
-  Builds server state.
-  """
+  @doc false
   @spec init(opts :: Keyword.t()) :: {:ok, State.t()}
   def init(opts) do
     {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
@@ -95,10 +79,25 @@ defmodule SpandexDatadog.ApiServer do
       waiting_traces: [],
       batch_size: opts[:batch_size],
       sync_threshold: opts[:sync_threshold],
-      agent_pid: agent_pid
+      agent_pid: agent_pid,
+      container_id: get_container_id()
     }
 
     {:ok, state}
+  end
+
+  @cgroup_uuid "[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}"
+  @cgroup_ctnr "[0-9a-f]{64}"
+  @cgroup_task "[0-9a-f]{32}-\\d+"
+  @cgroup_regex Regex.compile!(".*(#{@cgroup_uuid}|#{@cgroup_ctnr}|#{@cgroup_task})(?:\\.scope)?$", "m")
+
+  defp get_container_id() do
+    with {:ok, file_binary} <- File.read("/proc/self/cgroup"),
+         [_, container_id] <- Regex.run(@cgroup_regex, file_binary) do
+      container_id
+    else
+      _ -> nil
+    end
   end
 
   @doc """
@@ -133,8 +132,9 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @spec send_and_log([Trace.t()], State.t()) :: :ok
-  def send_and_log(traces, %{verbose?: verbose?} = state) do
+  def send_and_log(traces, %{container_id: container_id, verbose?: verbose?} = state) do
     headers = @headers ++ [{"X-Datadog-Trace-Count", length(traces)}]
+    headers = headers ++ List.wrap(if container_id, do: {"Datadog-Container-ID", container_id})
 
     response =
       traces
@@ -150,12 +150,14 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @deprecated "Please use format/3 instead"
+  @doc false
   @spec format(Trace.t()) :: map()
   def format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
     Enum.map(spans, fn span -> format(span, priority, baggage) end)
   end
 
   @deprecated "Please use format/3 instead"
+  @doc false
   @spec format(Span.t()) :: map()
   def format(%Span{} = span), do: format(span, 1, [])
 
@@ -271,8 +273,8 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   @spec add_error_type(map, Exception.t() | nil) :: map
-  defp add_error_type(meta, nil), do: meta
-  defp add_error_type(meta, exception), do: Map.put(meta, "error.type", exception.__struct__)
+  defp add_error_type(meta, %struct{}), do: Map.put(meta, "error.type", struct)
+  defp add_error_type(meta, _), do: meta
 
   @spec add_error_message(map, Exception.t() | nil) :: map
   defp add_error_message(meta, nil), do: meta
