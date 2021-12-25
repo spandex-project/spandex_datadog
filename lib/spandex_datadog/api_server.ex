@@ -222,7 +222,7 @@ defmodule SpandexDatadog.ApiServer do
         end)
       else
         # We get benefits from running in a separate process (like better GC)
-        # So we async/await here to mimic the behavour above but still apply backpressure
+        # So we async/await here to mimic the behaviour above but still apply backpressure
         task = Task.async(fn -> send_and_log(traces, state) end)
         Task.await(task)
       end
