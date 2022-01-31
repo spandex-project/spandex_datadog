@@ -27,7 +27,8 @@ defmodule SpandexDatadog.ApiServer do
       :batch_size,
       :sync_threshold,
       :agent_pid,
-      :container_id
+      :container_id,
+      :trap_exits?
     ]
   end
 
@@ -43,6 +44,7 @@ defmodule SpandexDatadog.ApiServer do
     verbose?: false,
     batch_size: 10,
     sync_threshold: 20,
+    trap_exits?: false,
     name: __MODULE__,
     api_adapter: SpandexDatadog.ApiServer
   ]
@@ -59,6 +61,7 @@ defmodule SpandexDatadog.ApiServer do
   * `:batch_size` - The number of traces that should be sent in a single batch. Defaults to `10`.
   * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to `20`.
   * `:name` - The name the GenServer should have. Currently only used for testing. Defaults to `SpandexDatadog.ApiServer`
+  * `:trap_exits?` - Whether or not to trap exits and attempt to flush traces on shutdown, defaults to `false`. Useful if you do frequent deploys and you don't want to lose traces each deploy.
   """
   @spec start_link(opts :: Keyword.t()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -70,7 +73,10 @@ defmodule SpandexDatadog.ApiServer do
   @doc false
   @spec init(opts :: Keyword.t()) :: {:ok, State.t()}
   def init(opts) do
-    Process.flag(:trap_exit, true)
+    if opts[:trap_exits?] do
+      Process.flag(:trap_exit, true)
+    end
+
     {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
 
     state = %State{
