@@ -178,7 +178,9 @@ defmodule SpandexDatadog.ApiServerTest do
             "zyx" => "[xyz: {1, 2}]"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_sampling_priority_v1" => 1,
+            "_dd.rule_psr" => 1.0,
+            "_dd.limit_psr" => 1.0
           },
           "name" => "foo",
           "resource" => "foo",
@@ -194,7 +196,9 @@ defmodule SpandexDatadog.ApiServerTest do
             "env" => "local"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_sampling_priority_v1" => 1,
+            "_dd.rule_psr" => 1.0,
+            "_dd.limit_psr" => 1.0
           },
           "name" => "bar",
           "resource" => "bar",
@@ -211,7 +215,9 @@ defmodule SpandexDatadog.ApiServerTest do
           },
           "metrics" => %{
             "_dd1.sr.eausr" => 1,
-            "_sampling_priority_v1" => 1
+            "_sampling_priority_v1" => 1,
+            "_dd.rule_psr" => 1.0,
+            "_dd.limit_psr" => 1.0
           },
           "name" => "bar",
           "resource" => "bar",
@@ -262,7 +268,9 @@ defmodule SpandexDatadog.ApiServerTest do
             "zyx" => "[xyz: {1, 2}]"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_sampling_priority_v1" => 1,
+            "_dd.rule_psr" => 1.0,
+            "_dd.limit_psr" => 1.0
           },
           "name" => "foo",
           "resource" => "foo",
@@ -278,7 +286,9 @@ defmodule SpandexDatadog.ApiServerTest do
             "env" => "local"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_sampling_priority_v1" => 1,
+            "_dd.rule_psr" => 1.0,
+            "_dd.limit_psr" => 1.0
           },
           "name" => "bar",
           "resource" => "bar",
@@ -294,6 +304,8 @@ defmodule SpandexDatadog.ApiServerTest do
             "env" => "local"
           },
           "metrics" => %{
+            "_dd.rule_psr" => 1.0,
+            "_dd.limit_psr" => 1.0,
             "_dd1.sr.eausr" => 1,
             "_sampling_priority_v1" => 1
           },

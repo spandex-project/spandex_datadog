@@ -65,7 +65,7 @@ defmodule SpandexDatadog.Test.AdapterTest do
     assert(Util.find_span("error_one_deep/0").error == 1)
   end
 
-  test "successul sibling spans are not marked as failures when sibling fails" do
+  test "successful sibling spans are not marked as failures when sibling fails" do
     Util.can_fail(fn -> TracedModule.two_fail_one_succeeds() end)
 
     assert(Util.find_span("error_one_deep/0", 0).error == 1)
