@@ -80,7 +80,7 @@ defmodule SpandexDatadog.ApiServerTest do
           agent_sample_rate: 1.0,
           sample_rate: 1.0,
           rule_sample_rate: 1.0,
-          rate_limiter_rate: 1.0,
+          rate_limiter_rate: 1.0
         ]
       )
 
