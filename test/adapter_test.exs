@@ -88,14 +88,26 @@ defmodule SpandexDatadog.Test.AdapterTest do
       assert span_context.priority == 2
     end
 
-    test "priority defaults to 1 (i.e. we currently assume all distributed traces should be kept)" do
+    test "returns a SpanContext struct when only x-datadog-trace-id and x-datadog-origin are set" do
+      conn =
+        :get
+        |> Plug.Test.conn("/")
+        |> Plug.Conn.put_req_header("x-datadog-trace-id", "123")
+        |> Plug.Conn.put_req_header("x-datadog-origin", "rum")
+
+      assert {:ok, %SpanContext{} = span_context} = Adapter.distributed_context(conn, [])
+      assert span_context.trace_id == 123
+      assert :proplists.get_value("_dd.origin", span_context.baggage) == "rum"
+    end
+
+    test "priority defaults to nil if there is no x-datadog-sampling-priority header" do
       conn =
         :get
         |> Plug.Test.conn("/")
         |> Plug.Conn.put_req_header("x-datadog-trace-id", "123")
         |> Plug.Conn.put_req_header("x-datadog-parent-id", "456")
 
-      assert {:ok, %SpanContext{priority: 1}} = Adapter.distributed_context(conn, [])
+      assert {:ok, %SpanContext{priority: nil}} = Adapter.distributed_context(conn, [])
     end
 
     test "returns an error when it cannot detect both a Trace ID and a Span ID" do
@@ -127,13 +139,13 @@ defmodule SpandexDatadog.Test.AdapterTest do
       assert span_context.priority == 2
     end
 
-    test "priority defaults to 1 (i.e. we currently assume all distributed traces should be kept)" do
+    test "priority is nil if x-datadog-sampling-priority header is not present" do
       headers = %{
         "x-datadog-trace-id" => "123",
         "x-datadog-parent-id" => "456"
       }
 
-      assert {:ok, %SpanContext{priority: 1}} = Adapter.distributed_context(headers, [])
+      assert {:ok, %SpanContext{priority: nil}} = Adapter.distributed_context(headers, [])
     end
 
     test "returns an error when it cannot detect both a Trace ID and a Span ID" do
@@ -151,8 +163,8 @@ defmodule SpandexDatadog.Test.AdapterTest do
 
       assert result == [
                {"x-datadog-trace-id", "123"},
-               {"x-datadog-parent-id", "456"},
                {"x-datadog-sampling-priority", "10"},
+               {"x-datadog-parent-id", "456"},
                {"header1", "value1"},
                {"header2", "value2"}
              ]
@@ -170,6 +182,19 @@ defmodule SpandexDatadog.Test.AdapterTest do
                "x-datadog-sampling-priority" => "10",
                "header1" => "value1",
                "header2" => "value2"
+             }
+    end
+
+    test "Sets x-datadog-origin from baggage" do
+      span_context = %SpanContext{trace_id: 123, parent_id: 456, priority: 10, baggage: [{"_dd.origin", "rum"}]}
+
+      result = Adapter.inject_context(%{}, span_context, [])
+
+      assert result == %{
+               "x-datadog-trace-id" => "123",
+               "x-datadog-parent-id" => "456",
+               "x-datadog-sampling-priority" => "10",
+               "x-datadog-origin" => "rum"
              }
     end
   end

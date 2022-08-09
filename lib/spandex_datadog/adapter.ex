@@ -33,91 +33,123 @@ defmodule SpandexDatadog.Adapter do
   Fetches the Datadog-specific conn request headers if they are present.
   """
   @impl Spandex.Adapter
-  @spec distributed_context(conn :: Plug.Conn.t(), Tracer.opts()) ::
-          {:ok, SpanContext.t()}
-          | {:error, :no_distributed_trace}
-  def distributed_context(%Plug.Conn{} = conn, _opts) do
-    trace_id = get_first_header(conn, "x-datadog-trace-id")
-    parent_id = get_first_header(conn, "x-datadog-parent-id")
-    priority = get_first_header(conn, "x-datadog-sampling-priority") || 1
-
-    if is_nil(trace_id) || is_nil(parent_id) do
-      {:error, :no_distributed_trace}
-    else
-      {:ok, %SpanContext{trace_id: trace_id, parent_id: parent_id, priority: priority}}
-    end
+  @spec distributed_context(Plug.Conn.t(), Tracer.opts()) ::
+          {:ok, SpanContext.t()} | {:error, :no_distributed_trace}
+  def distributed_context(%Plug.Conn{req_headers: headers}, opts) do
+    distributed_context(headers, opts)
   end
 
   @impl Spandex.Adapter
-  @spec distributed_context(headers :: Spandex.headers(), Tracer.opts()) ::
-          {:ok, SpanContext.t()}
-          | {:error, :no_distributed_trace}
+  @spec distributed_context(Spandex.headers(), Tracer.opts()) ::
+          {:ok, SpanContext.t()} | {:error, :no_distributed_trace}
   def distributed_context(headers, _opts) do
-    trace_id = get_header(headers, "x-datadog-trace-id")
-    parent_id = get_header(headers, "x-datadog-parent-id")
-    priority = get_header(headers, "x-datadog-sampling-priority") || 1
-
-    if is_nil(trace_id) || is_nil(parent_id) do
-      {:error, :no_distributed_trace}
-    else
-      {:ok, %SpanContext{trace_id: trace_id, parent_id: parent_id, priority: priority}}
-    end
+    headers
+    |> Enum.reduce(%SpanContext{}, &extract_header/2)
+    |> validate_context()
   end
 
   @doc """
   Injects Datadog-specific HTTP headers to represent the specified SpanContext
   """
   @impl Spandex.Adapter
-  @spec inject_context([{term(), term()}], SpanContext.t(), Tracer.opts()) :: [{term(), term()}]
-  def inject_context(headers, %SpanContext{} = span_context, _opts) when is_list(headers) do
-    span_context
-    |> tracing_headers()
-    |> Kernel.++(headers)
+  @spec inject_context(Spandex.headers(), SpanContext.t(), Tracer.opts()) :: Spandex.headers()
+  def inject_context(headers, %SpanContext{} = span_context, opts) when is_map(headers) do
+    inject_context(Map.to_list(headers), span_context, opts) |> Enum.into(%{})
   end
 
-  def inject_context(headers, %SpanContext{} = span_context, _opts) when is_map(headers) do
+  def inject_context(headers, %SpanContext{} = span_context, _opts) when is_list(headers) do
     span_context
-    |> tracing_headers()
-    |> Enum.into(%{})
-    |> Map.merge(headers)
+    |> Map.from_struct()
+    |> Enum.reject(fn {_, value} -> is_nil(value) end)
+    |> Enum.reduce([], &inject_header/2)
+    |> Enum.concat(headers)
   end
 
   # Private Helpers
 
-  @spec get_first_header(Plug.Conn.t(), String.t()) :: integer() | nil
-  defp get_first_header(conn, header_name) do
-    conn
-    |> Plug.Conn.get_req_header(header_name)
-    |> List.first()
-    |> parse_header()
+  # Reduce function that sets values in SpanContext for headers
+  @spec extract_header({binary(), binary()}, SpanContext.t()) :: SpanContext.t()
+  defp extract_header({"x-datadog-trace-id", value}, span_context) do
+    put_context_int(span_context, :trace_id, value)
   end
 
-  @spec get_header(%{}, String.t()) :: integer() | nil
-  defp get_header(headers, key) when is_map(headers) do
-    Map.get(headers, key, nil)
-    |> parse_header()
+  defp extract_header({"x-datadog-parent-id", value}, span_context) do
+    put_context_int(span_context, :parent_id, value)
   end
 
-  @spec get_header([], String.t()) :: integer() | nil
-  defp get_header(headers, key) when is_list(headers) do
-    Enum.find_value(headers, fn {k, v} -> if k == key, do: v end)
-    |> parse_header()
+  defp extract_header({"x-datadog-sampling-priority", value}, span_context) do
+    put_context_int(span_context, :priority, value)
   end
 
-  defp parse_header(header) when is_bitstring(header) do
-    case Integer.parse(header) do
-      {int, _} -> int
-      _ -> nil
+  defp extract_header({"x-datadog-origin", value}, span_context) do
+    %{span_context | baggage: span_context.baggage ++ [{"_dd.origin", value}]}
+  end
+
+  # Update context with value if it is an integer
+  @spec put_context_int(Spandex.SpanContext.t(), atom(), binary()) :: Spandex.SpanContext.t()
+  defp put_context_int(span_context, key, value) do
+    case Integer.parse(value) do
+      {int_value, _} ->
+        Map.put(span_context, key, int_value)
+
+      _ ->
+        span_context
     end
   end
 
-  defp parse_header(_header), do: nil
+  # Determine if SpanContext is valid
+  @spec validate_context(SpanContext.t()) ::
+          {:ok, SpanContext.t()} | {:error, :no_distributed_trace}
+  defp validate_context(%{trace_id: nil}) do
+    {:error, :no_distributed_trace}
+  end
 
-  defp tracing_headers(%SpanContext{trace_id: trace_id, parent_id: parent_id, priority: priority}) do
-    [
-      {"x-datadog-trace-id", to_string(trace_id)},
-      {"x-datadog-parent-id", to_string(parent_id)},
-      {"x-datadog-sampling-priority", to_string(priority)}
-    ]
+  # Based on the code of the Ruby libary, it seems valid
+  # to have onlly the trace_id and origin headers set, but not parent_id.
+  # This might happen with RUM or synthetic traces.
+  defp validate_context(%{parent_id: nil} = span_context) do
+    case :proplists.get_value("_dd.origin", span_context.baggage) do
+      :undefined ->
+        {:error, :no_distributed_trace}
+
+      _ ->
+        {:ok, span_context}
+    end
+  end
+
+  defp validate_context(span_context) do
+    {:ok, span_context}
+  end
+
+  # Add SpanContext value to headers
+  @spec inject_header({atom(), term()}, [{binary(), binary()}]) :: [{binary(), binary()}]
+  defp inject_header({:baggage, []}, headers) do
+    headers
+  end
+
+  defp inject_header({:baggage, baggage}, headers) do
+    case :proplists.get_value("_dd.origin", baggage) do
+      :undefined ->
+        headers
+
+      value ->
+        [{"x-datadog-origin", value} | headers]
+    end
+  end
+
+  defp inject_header({:trace_id, value}, headers) do
+    [{"x-datadog-trace-id", to_string(value)} | headers]
+  end
+
+  defp inject_header({:parent_id, value}, headers) do
+    [{"x-datadog-parent-id", to_string(value)} | headers]
+  end
+
+  defp inject_header({:priority, value}, headers) do
+    [{"x-datadog-sampling-priority", to_string(value)} | headers]
+  end
+
+  defp inject_header(_, headers) do
+    headers
   end
 end
