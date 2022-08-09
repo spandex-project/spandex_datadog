@@ -82,7 +82,7 @@ defmodule SpandexDatadog.Adapter do
   end
 
   defp extract_header({"x-datadog-origin", value}, span_context) do
-    %{span_context | baggage: span_context.baggage ++ [{"_dd.origin", value}]}
+    %{span_context | baggage: span_context.baggage ++ [{:"_dd.origin", value}]}
   end
 
   # Update context with value if it is an integer
@@ -108,7 +108,7 @@ defmodule SpandexDatadog.Adapter do
   # to have onlly the trace_id and origin headers set, but not parent_id.
   # This might happen with RUM or synthetic traces.
   defp validate_context(%{parent_id: nil} = span_context) do
-    case :proplists.get_value("_dd.origin", span_context.baggage) do
+    case :proplists.get_value(:"_dd.origin", span_context.baggage) do
       :undefined ->
         {:error, :no_distributed_trace}
 
@@ -128,12 +128,11 @@ defmodule SpandexDatadog.Adapter do
   end
 
   defp inject_header({:baggage, baggage}, headers) do
-    case :proplists.get_value("_dd.origin", baggage) do
-      :undefined ->
-        headers
-
-      value ->
+    case Keyword.fetch(baggage, :"_dd.origin") do
+      {:ok, value} ->
         [{"x-datadog-origin", value} | headers]
+      :error ->
+        headers
     end
   end
 
