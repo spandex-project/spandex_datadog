@@ -259,6 +259,7 @@ defmodule SpandexDatadog.ApiServer do
     case Keyword.fetch(baggage, :"_dd.origin") do
       {:ok, value} ->
         Map.put(meta, "_dd.origin", value)
+
       :error ->
         meta
     end
