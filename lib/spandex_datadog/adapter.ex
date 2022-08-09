@@ -85,6 +85,10 @@ defmodule SpandexDatadog.Adapter do
     %{span_context | baggage: span_context.baggage ++ [{:"_dd.origin", value}]}
   end
 
+  defp extract_header(_, span_context) do
+    span_context
+  end
+
   # Update context with value if it is an integer
   @spec put_context_int(Spandex.SpanContext.t(), atom(), binary()) :: Spandex.SpanContext.t()
   defp put_context_int(span_context, key, value) do
