@@ -97,7 +97,7 @@ defmodule SpandexDatadog.Test.AdapterTest do
 
       assert {:ok, %SpanContext{} = span_context} = Adapter.distributed_context(conn, [])
       assert span_context.trace_id == 123
-      assert :proplists.get_value("_dd.origin", span_context.baggage) == "rum"
+      assert span_context.baggage[:"_dd.origin"] == "rum"
     end
 
     test "priority defaults to nil if there is no x-datadog-sampling-priority header" do
@@ -186,7 +186,7 @@ defmodule SpandexDatadog.Test.AdapterTest do
     end
 
     test "Sets x-datadog-origin from baggage" do
-      span_context = %SpanContext{trace_id: 123, parent_id: 456, priority: 10, baggage: [{"_dd.origin", "rum"}]}
+      span_context = %SpanContext{trace_id: 123, parent_id: 456, priority: 10, baggage: [{:"_dd.origin", "rum"}]}
 
       result = Adapter.inject_context(%{}, span_context, [])
 
