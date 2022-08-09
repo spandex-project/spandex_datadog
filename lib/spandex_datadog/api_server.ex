@@ -91,7 +91,7 @@ defmodule SpandexDatadog.ApiServer do
   @cgroup_task "[0-9a-f]{32}-\\d+"
   @cgroup_regex Regex.compile!(".*(#{@cgroup_uuid}|#{@cgroup_ctnr}|#{@cgroup_task})(?:\\.scope)?$", "m")
 
-  defp get_container_id() do
+  defp get_container_id do
     with {:ok, file_binary} <- File.read("/proc/self/cgroup"),
          [_, container_id] <- Regex.run(@cgroup_regex, file_binary) do
       container_id
@@ -421,7 +421,6 @@ defmodule SpandexDatadog.ApiServer do
   defp add_priority_metrics(metrics, priority) do
     Map.put(metrics, "_sampling_priority_v1", priority)
   end
-
 
   @spec error(nil | Keyword.t()) :: integer
   defp error(nil), do: 0
