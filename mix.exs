@@ -52,7 +52,7 @@ defmodule SpandexDatadog.MixProject do
   defp deps do
     [
       {:msgpax, "~> 2.2.1 or ~> 2.3"},
-      {:spandex, "~> 3.0"},
+      {:spandex, github: "TheRealReal/spandex", branch: "distributed-sampling-priority"},
       {:telemetry, "~> 0.4.2 or ~> 1.0"},
       # Dev- and test-only deps
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
