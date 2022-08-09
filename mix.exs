@@ -55,6 +55,8 @@ defmodule SpandexDatadog.MixProject do
       {:spandex, "~> 3.0"},
       {:telemetry, "~> 0.4.2 or ~> 1.0"},
       # Dev- and test-only deps
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:httpoison, "~> 0.13 or ~> 1.0", only: :test}
     ]
