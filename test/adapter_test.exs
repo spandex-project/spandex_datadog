@@ -155,7 +155,7 @@ defmodule SpandexDatadog.Test.AdapterTest do
   end
 
   describe "inject_context/3" do
-    test "Prepends distributed tracing headers to an existing list of headers" do
+    test "prepends distributed tracing headers to an existing list of headers" do
       span_context = %SpanContext{trace_id: 123, parent_id: 456, priority: 10}
       headers = [{"header1", "value1"}, {"header2", "value2"}]
 
@@ -170,7 +170,7 @@ defmodule SpandexDatadog.Test.AdapterTest do
              ]
     end
 
-    test "Merges distributed tracing headers with an existing map of headers" do
+    test "merges distributed tracing headers with an existing map of headers" do
       span_context = %SpanContext{trace_id: 123, parent_id: 456, priority: 10}
       headers = %{"header1" => "value1", "header2" => "value2"}
 
@@ -185,7 +185,7 @@ defmodule SpandexDatadog.Test.AdapterTest do
              }
     end
 
-    test "Sets x-datadog-origin from baggage" do
+    test "sets x-datadog-origin from baggage" do
       span_context = %SpanContext{trace_id: 123, parent_id: 456, priority: 10, baggage: [{:"_dd.origin", "rum"}]}
 
       result = Adapter.inject_context(%{}, span_context, [])
