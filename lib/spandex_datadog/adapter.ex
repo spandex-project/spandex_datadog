@@ -112,12 +112,10 @@ defmodule SpandexDatadog.Adapter do
   # to have onlly the trace_id and origin headers set, but not parent_id.
   # This might happen with RUM or synthetic traces.
   defp validate_context(%{parent_id: nil} = span_context) do
-    case :proplists.get_value(:"_dd.origin", span_context.baggage) do
-      :undefined ->
-        {:error, :no_distributed_trace}
-
-      _ ->
-        {:ok, span_context}
+    if Keyword.has_key?(span_context.baggage, :"_dd.origin") do
+      {:ok, span_context}
+    else
+      {:error, :no_distributed_trace}
     end
   end
 
@@ -135,6 +133,7 @@ defmodule SpandexDatadog.Adapter do
     case Keyword.fetch(baggage, :"_dd.origin") do
       {:ok, value} ->
         [{"x-datadog-origin", value} | headers]
+
       :error ->
         headers
     end
