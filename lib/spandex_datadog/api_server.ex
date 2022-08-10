@@ -385,7 +385,8 @@ defmodule SpandexDatadog.ApiServer do
     Map.put(metrics, "_dd1.sr.eausr", value)
   end
 
-  # Backwards compatibility
+  # Set a segment to always be sampled.
+  # `sample_rate` tag should be used instead.
   defp add_tag_metric({:analytics_event, value}, metrics) when value in [nil, false], do: metrics
 
   defp add_tag_metric({:analytics_event, _value}, metrics) do
