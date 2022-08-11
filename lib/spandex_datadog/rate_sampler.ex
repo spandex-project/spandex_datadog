@@ -24,6 +24,10 @@ defmodule SpandexDatadog.RateSampler do
   be sampled, and 1.0 means that all traces will be sampled.
   """
   @spec sampled?(non_neg_integer() | Spandex.Trace.t() | Spandex.Span.t(), float()) :: boolean()
+  def sampled?(_, 1.0), do: true
+
+  def sampled?(_, 0.0), do: false
+
   def sampled?(trace_id, sample_rate) when is_integer(trace_id) do
     threshold = sample_rate * @external_max_id
     ((trace_id * @knuth_factor) % @external_max_id) <= threshold
