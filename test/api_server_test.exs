@@ -202,7 +202,7 @@ defmodule SpandexDatadog.ApiServerTest do
             "env" => "local"
           },
           "metrics" => %{
-            "_dd1.sr.eausr" => 1,
+            "_dd1.sr.eausr" => 1.0,
             "_sampling_priority_v1" => 2
           },
           "name" => "bar",
@@ -292,7 +292,7 @@ defmodule SpandexDatadog.ApiServerTest do
             "env" => "local"
           },
           "metrics" => %{
-            "_dd1.sr.eausr" => 1,
+            "_dd1.sr.eausr" => 1.0,
             "_sampling_priority_v1" => 2
           },
           "name" => "bar",
