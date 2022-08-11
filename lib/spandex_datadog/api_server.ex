@@ -390,7 +390,7 @@ defmodule SpandexDatadog.ApiServer do
   defp add_tag_metric({:analytics_event, value}, metrics) when value in [nil, false], do: metrics
 
   defp add_tag_metric({:analytics_event, _value}, metrics) do
-    Map.put(metrics, "_dd1.sr.eausr", 1)
+    Map.put(metrics, "_dd1.sr.eausr", 1.0)
   end
 
   # If rule sampling is applied to a span, set metric for the sample rate
