@@ -12,7 +12,10 @@ defmodule SpandexDatadog.Adapter do
     Tracer
   }
 
+  # Max value for a trace_id. We only generate 63-bit integers due to
+  # limitations in other languages, but other systems may use the full 64-bits.
   @max_id 9_223_372_036_854_775_807
+  # @max_id Bitwise.bsl(1, 63) - 1
 
   @impl Spandex.Adapter
   def trace_id, do: :rand.uniform(@max_id)
