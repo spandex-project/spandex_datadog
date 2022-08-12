@@ -22,7 +22,7 @@ defmodule SpandexDatadog.RateSampler do
   """
   @spec sampled?(non_neg_integer() | nil | Spandex.Trace.t() | Spandex.Span.t(), float()) :: boolean()
   # trace_id may be nil when tracing is disabled
-  def sampled?(nil, 1.0), do: false
+  def sampled?(nil, _), do: false
 
   # Shortcut processing for common cases
   def sampled?(_, 1.0), do: true
