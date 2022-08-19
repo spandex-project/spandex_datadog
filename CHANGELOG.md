@@ -5,6 +5,20 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+### Breaking Changes:
+* Change default `priority` to `nil` (not set) instead of 1
+* Do not send metric for `priority` unless set
+* Do not set `x-datadog-sampling-priority` header unless priority is set
+* Use `sample_rate` tag to set `_dd1.sr.eausr` value
+* Use `rule_sample_rate` tag to set `_dd.rule_psr` without default (previously hard coded to 1.0)
+* Use `rate_limiter_rate` tag to set `_dd.limit_psr`, without default (previously hard coded to 1.0)
+* Update library deps
+
+### Features:
+* Handle `x-datadog-origin` header
+* Use `agent_sample_rate` tag to set `_dd.agent_psr`, without default (was 1.0)
+* Add sampler which samples a proportion of traces, setting `priority`
+
 ## [1.2.0](https://github.com/spandex-project/spandex_datadog/compare/1.1.0...1.2.0) (2021-10-23)
 
 ### Features:
