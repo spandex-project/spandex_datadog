@@ -101,7 +101,7 @@ In distributed tracing, the priority may be set as follows:
   `SpandexDatadog.RateSampler.sampled?/2` supports sampling a proportion of
   traces based on the `trace_id` (which should be assigned randomly).  This would
   typically be called from in a Phoenix `plug`, which then sets the priority to 1
-  on the current trace using Spandex.Tracer.update_priority/2`.
+  on the current trace using `Spandex.Tracer.update_priority/2`.
 
 * Force tracking manually by setting priority to 2 on the trace in application
   code. This is usually done for requests with errors, as they are the ones
@@ -112,12 +112,12 @@ In distributed tracing, the priority may be set as follows:
 Older versions of Datadog used rate sampling to tune the priority of spans, but
 those are considered obsolete. You can still set them by adding tags to spans:
 
-* Use `sample_rate` tag to set "_dd1.sr.eausr"
-* Use `rule_sample_rate` tag to set "_dd.rule_psr" without default (previously
+* Use `sample_rate` tag to set `_dd1.sr.eausr`
+* Use `rule_sample_rate` tag to set `_dd.rule_psr` without default (previously
   hard coded to 1.0)
-* Use `rate_limiter_rate` tag to set "_dd.limit_psr", without default
+* Use `rate_limiter_rate` tag to set `_dd.limit_psr`, without default
   (previously hard coded to 1.0)
-* Use `agent_sample_rate` tag to set "_dd.agent_psr" without default (was 1.0)
+* Use `agent_sample_rate` tag to set `_dd.agent_psr` without default (was 1.0)
 
 ## Telemetry
 
