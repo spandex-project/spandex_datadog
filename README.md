@@ -77,11 +77,11 @@ This adapter supports distributed trace sampling according to the new Datadog
 Spandex stores the `priority` as an integer in the top level `Spandex.Trace`.
 
 In Datadog, there are four values:
-* `USER_KEEP`(2) indicates that the application wants to ensure that a trace is
+* `MANUAL_KEEP`(2) indicates that the application wants to ensure that a trace is
   sampled, e.g. if there is an error
 * `AUTO_KEEP` (1) indicates that a trace has been selected for sampling
 * `AUTO_REJECT` (0) indicates that the trace has not been selected for sampling
-* `USER_REJECT` (-1) indicates that the application wants a trace to be dropped
+* `MANUAL_REJECT` (-1) indicates that the application wants a trace to be dropped
 
 Datadog uses the `x-datadog-sampling-priority` header to determine whether a
 trace should be sampled. See the [Datadog documentation]:
