@@ -8,7 +8,7 @@ defmodule SpandexDatadog.RateSampler do
   # system may generate one.
   @external_max_id Bitwise.bsl(1, 64)
 
-  @knuth_factor 1111111111111111111
+  @knuth_factor 1_111_111_111_111_111_111
 
   @doc """
   Determine whether a trace should be sampled.
