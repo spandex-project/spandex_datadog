@@ -57,7 +57,7 @@ That is handled in this adapter by `SpandexDatadog.Adapter.distributed_context/2
 `SpandexDatadog.Adapter.inject_context/3`, which read and generate Datadog-specific
 HTTP headers based on the state of the trace. If these headers are set, the
 trace will be continued instead of starting a new one.
-They are called by [spandex_phoenix](https://github.com/spandex-project/spandex_phoenix)
+These functions are called in [spandex_phoenix](https://github.com/spandex-project/spandex_phoenix)
 when receiving a request and by your own HTTP requests to downstream services.
 
 ## Sampling and Rate Limiting
