@@ -10,7 +10,7 @@ defmodule SpandexDatadog.MixProject do
       deps: deps(),
       description: "A datadog API adapter for spandex.",
       docs: docs(),
-      elixir: "~> 1.6",
+      elixir: "~> 1.11",
       elixirc_paths: elixirc_paths(Mix.env()),
       package: package(),
       start_permanent: Mix.env() == :prod,
