@@ -51,7 +51,7 @@ jobs:
 
       - name: Run tests
         run: |
-          mix test --warnings-as-errors
+          mix test
           mix format --check-formatted
 
       # - name: Publish unit test results to GitHub
