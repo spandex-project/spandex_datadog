@@ -1,10 +1,10 @@
-use Mix.Config
+import Config
 
 config :logger, :console,
   level: :debug,
   colors: [enabled: false],
   format: "$time $metadata[$level] $message\n",
-  metadata: [:trace_id, :span_id]
+  metadata: [:trace_id, :span_id, :file, :line]
 
 config :spandex_datadog, SpandexDatadog.Test.Support.Tracer,
   service: :spandex_test,

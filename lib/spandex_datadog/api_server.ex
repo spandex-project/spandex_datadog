@@ -91,7 +91,7 @@ defmodule SpandexDatadog.ApiServer do
   @cgroup_task "[0-9a-f]{32}-\\d+"
   @cgroup_regex Regex.compile!(".*(#{@cgroup_uuid}|#{@cgroup_ctnr}|#{@cgroup_task})(?:\\.scope)?$", "m")
 
-  defp get_container_id() do
+  defp get_container_id do
     with {:ok, file_binary} <- File.read("/proc/self/cgroup"),
          [_, container_id] <- Regex.run(@cgroup_regex, file_binary) do
       container_id
@@ -161,8 +161,8 @@ defmodule SpandexDatadog.ApiServer do
   @spec format(Span.t()) :: map()
   def format(%Span{} = span), do: format(span, 1, [])
 
-  @spec format(Span.t(), integer(), Keyword.t()) :: map()
-  def format(%Span{} = span, priority, _baggage) do
+  @spec format(Span.t(), integer() | nil, Keyword.t()) :: map()
+  def format(%Span{} = span, priority, baggage) do
     %{
       trace_id: span.trace_id,
       span_id: span.id,
@@ -174,13 +174,8 @@ defmodule SpandexDatadog.ApiServer do
       resource: span.resource || span.name,
       service: span.service,
       type: span.type,
-      meta: meta(span),
-      metrics:
-        metrics(span, %{
-          _sampling_priority_v1: priority,
-          "_dd.rule_psr": 1.0,
-          "_dd.limit_psr": 1.0
-        })
+      meta: meta(span, priority, baggage),
+      metrics: metrics(span, priority, baggage)
     }
   end
 
@@ -243,16 +238,31 @@ defmodule SpandexDatadog.ApiServer do
     end)
   end
 
-  @spec meta(Span.t()) :: map
-  defp meta(span) do
+  @spec meta(Span.t(), integer() | nil, Keyword.t()) :: map()
+  defp meta(span, _priority, baggage) do
     %{}
+    |> add_baggage_meta(baggage)
     |> add_datadog_meta(span)
     |> add_error_data(span)
     |> add_http_data(span)
     |> add_sql_data(span)
-    |> add_tags(span)
+    |> add_tags_meta(span)
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Enum.into(%{})
+  end
+
+  @spec add_baggage_meta(map(), Keyword.t()) :: map()
+  defp add_baggage_meta(meta, []), do: meta
+
+  defp add_baggage_meta(meta, baggage) do
+    # distributed tracing
+    case Keyword.fetch(baggage, :"_dd.origin") do
+      {:ok, value} ->
+        Map.put(meta, "_dd.origin", value)
+
+      :error ->
+        meta
+    end
   end
 
   @spec add_datadog_meta(map, Span.t()) :: map
@@ -313,42 +323,105 @@ defmodule SpandexDatadog.ApiServer do
     |> Map.put("sql.db", sql[:db])
   end
 
-  @spec add_tags(map, Span.t()) :: map
-  defp add_tags(meta, %{tags: nil}), do: meta
+  @spec add_tags_meta(map(), Span.t()) :: map()
+  defp add_tags_meta(meta, %{tags: nil}), do: meta
 
-  defp add_tags(meta, %{tags: tags}) do
-    tags = tags |> Keyword.delete(:analytics_event)
-
-    Map.merge(
-      meta,
-      tags
-      |> Enum.map(fn {k, v} -> {k, term_to_string(v)} end)
-      |> Enum.into(%{})
-    )
+  defp add_tags_meta(meta, %{tags: tags}) do
+    Enum.reduce(tags, meta, &add_tag_meta/2)
   end
 
-  @spec metrics(Span.t(), map) :: map
-  defp metrics(span, initial_value = %{}) do
-    initial_value
-    |> add_metrics(span)
+  defp add_tag_meta({:hostname, value}, meta) do
+    Map.put(meta, "_dd.hostname", value)
+  end
+
+  defp add_tag_meta({:origin, value}, meta) do
+    Map.put(meta, "_dd.origin", value)
+  end
+
+  # Handled in metrics
+  defp add_tag_meta({:analytics_event, _value}, meta), do: meta
+
+  # Tags with numeric values go in metrics
+  defp add_tag_meta({_key, value}, meta) when is_integer(value) or is_float(value) do
+    meta
+  end
+
+  defp add_tag_meta({key, value}, meta) do
+    Map.put(meta, to_string(key), term_to_string(value))
+  end
+
+  # Some tags understood by Datadog:
+  # runtime-id
+  # language: "elixir"
+  # system.pid: OS pid
+  # peer.hostname: Hostname of external service interacted with
+  # peer.service: Name of external service that performed the work
+
+  @spec metrics(Span.t(), integer() | nil, Keyword.t()) :: map()
+  defp metrics(span, priority, _baggage) do
+    %{}
+    |> add_priority_metrics(priority)
+    |> add_tags_metrics(span)
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Enum.into(%{})
   end
 
-  @spec add_metrics(map, Span.t()) :: map
-  defp add_metrics(metrics, %{tags: nil}), do: metrics
+  # Special tag names come mostly from the Ruby Datadog library
+  # ddtrace-1.1.0/lib/ddtrace/transport/trace_formatter.rb
 
-  defp add_metrics(metrics, %{tags: tags}) do
-    with analytics_event <- tags |> Keyword.get(:analytics_event),
-         true <- analytics_event != nil do
-      Map.merge(
-        metrics,
-        %{"_dd1.sr.eausr" => 1}
-      )
-    else
-      _ ->
-        metrics
-    end
+  @spec add_tags_metrics(map(), Span.t()) :: map()
+  defp add_tags_metrics(meta, %{tags: nil}), do: meta
+
+  defp add_tags_metrics(meta, %{tags: tags}) do
+    Enum.reduce(tags, meta, &add_tag_metric/2)
+  end
+
+  # Sampling
+  defp add_tag_metric({:agent_sample_rate, value}, metrics) do
+    Map.put(metrics, "_dd.agent_psr", value)
+  end
+
+  defp add_tag_metric({:sample_rate, value}, metrics) do
+    Map.put(metrics, "_dd1.sr.eausr", value)
+  end
+
+  # Set a segment to always be sampled.
+  # `sample_rate` tag should be used instead.
+  defp add_tag_metric({:analytics_event, value}, metrics) when value in [nil, false], do: metrics
+
+  defp add_tag_metric({:analytics_event, _value}, metrics) do
+    Map.put(metrics, "_dd1.sr.eausr", 1.0)
+  end
+
+  # If rule sampling is applied to a span, set metric for the sample rate
+  # configured for that rule. This should be done regardless of sampling
+  # outcome.
+  defp add_tag_metric({:rule_sample_rate, value}, metrics) do
+    Map.put(metrics, "_dd.rule_psr", value)
+  end
+
+  # If rate limiting is checked on a span, set metric for the effective rate
+  # limiting rate applied. This should be done regardless of rate limiting
+  # outcome.
+  defp add_tag_metric({:rate_limiter_rate, value}, metrics) do
+    Map.put(metrics, "_dd.limit_psr", value)
+  end
+
+  defp add_tag_metric({key, value}, metrics) when is_integer(value) or is_float(value) do
+    Map.put(metrics, to_string(key), value)
+  end
+
+  defp add_tag_metric(_, metrics) do
+    metrics
+  end
+
+  # Set priority from context
+  @spec add_priority_metrics(map(), integer() | nil) :: map()
+  defp add_priority_metrics(metrics, nil), do: metrics
+
+  # Distributed tracing
+  defp add_priority_metrics(metrics, priority) do
+    Map.put(metrics, "_sampling_priority_v1", priority)
   end
 
   @spec error(nil | Keyword.t()) :: integer

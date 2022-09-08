@@ -10,7 +10,7 @@ defmodule SpandexDatadog.MixProject do
       deps: deps(),
       description: "A datadog API adapter for spandex.",
       docs: docs(),
-      elixir: "~> 1.6",
+      elixir: "~> 1.11",
       elixirc_paths: elixirc_paths(Mix.env()),
       package: package(),
       start_permanent: Mix.env() == :prod,
@@ -52,9 +52,11 @@ defmodule SpandexDatadog.MixProject do
   defp deps do
     [
       {:msgpax, "~> 2.2.1 or ~> 2.3"},
-      {:spandex, "~> 3.0"},
+      {:spandex, github: "TheRealReal/spandex", branch: "distributed-sampling-priority"},
       {:telemetry, "~> 0.4.2 or ~> 1.0"},
       # Dev- and test-only deps
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:httpoison, "~> 0.13 or ~> 1.0", only: :test}
     ]

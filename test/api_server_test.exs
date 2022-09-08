@@ -61,7 +61,8 @@ defmodule SpandexDatadog.ApiServerTest do
         service: :bar,
         env: "local",
         name: "bar",
-        trace_id: trace_id
+        trace_id: trace_id,
+        tags: [analytics_event: true]
       )
 
     {:ok, span_3} =
@@ -73,10 +74,17 @@ defmodule SpandexDatadog.ApiServerTest do
         env: "local",
         name: "bar",
         trace_id: trace_id,
-        tags: [analytics_event: true]
+        tags: [
+          hostname: "moon",
+          origin: "web",
+          agent_sample_rate: 1.0,
+          sample_rate: 1.0,
+          rule_sample_rate: 1.0,
+          rate_limiter_rate: 1.0
+        ]
       )
 
-    trace = %Trace{spans: [span_1, span_2, span_3]}
+    trace = %Trace{spans: [span_1, span_2, span_3], priority: 2}
 
     {
       :ok,
@@ -170,7 +178,6 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000,
           "error" => 0,
           "meta" => %{
-            "bar" => "321",
             "baz" => "{1, 2}",
             "buz" => "blitz",
             "env" => "local",
@@ -178,9 +185,8 @@ defmodule SpandexDatadog.ApiServerTest do
             "zyx" => "[xyz: {1, 2}]"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "bar" => 321,
+            "_sampling_priority_v1" => 2
           },
           "name" => "foo",
           "resource" => "foo",
@@ -196,9 +202,8 @@ defmodule SpandexDatadog.ApiServerTest do
             "env" => "local"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "_dd1.sr.eausr" => 1.0,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -211,13 +216,16 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
-            "env" => "local"
+            "env" => "local",
+            "_dd.hostname" => "moon",
+            "_dd.origin" => "web"
           },
           "metrics" => %{
-            "_dd1.sr.eausr" => 1,
-            "_sampling_priority_v1" => 1,
+            "_dd.agent_psr" => 1.0,
+            "_dd1.sr.eausr" => 1.0,
             "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "_dd.limit_psr" => 1.0,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -260,7 +268,6 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000,
           "error" => 0,
           "meta" => %{
-            "bar" => "321",
             "baz" => "{1, 2}",
             "buz" => "blitz",
             "env" => "local",
@@ -268,9 +275,8 @@ defmodule SpandexDatadog.ApiServerTest do
             "zyx" => "[xyz: {1, 2}]"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "bar" => 321,
+            "_sampling_priority_v1" => 2
           },
           "name" => "foo",
           "resource" => "foo",
@@ -286,9 +292,8 @@ defmodule SpandexDatadog.ApiServerTest do
             "env" => "local"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "_dd1.sr.eausr" => 1.0,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -301,13 +306,16 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
-            "env" => "local"
+            "env" => "local",
+            "_dd.hostname" => "moon",
+            "_dd.origin" => "web"
           },
           "metrics" => %{
+            "_dd.agent_psr" => 1.0,
             "_dd.rule_psr" => 1.0,
             "_dd.limit_psr" => 1.0,
-            "_dd1.sr.eausr" => 1,
-            "_sampling_priority_v1" => 1
+            "_dd1.sr.eausr" => 1.0,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
