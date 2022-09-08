@@ -112,7 +112,7 @@ defmodule SpandexDatadog.Adapter do
   end
 
   # Based on the code of the Ruby libary, it seems valid
-  # to have onlly the trace_id and origin headers set, but not parent_id.
+  # to have only the trace_id and origin headers set, but not parent_id.
   # This might happen with RUM or synthetic traces.
   defp validate_context(%{parent_id: nil} = span_context) do
     if Keyword.has_key?(span_context.baggage, :"_dd.origin") do
