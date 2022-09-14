@@ -88,6 +88,32 @@ defmodule SpandexDatadog.Test.AdapterTest do
       assert span_context.priority == 2
     end
 
+    test "returns a SpanContext struct with the parsed b3 headers" do
+      conn =
+        :get
+        |> Plug.Test.conn("/")
+        |> Plug.Conn.put_req_header("x-b3-traceid", "00ef01")
+        |> Plug.Conn.put_req_header("x-b3-spanid", "011ef0")
+        |> Plug.Conn.put_req_header("x-b3-sampled", "0")
+
+      assert {:ok, %SpanContext{} = span_context} = Adapter.distributed_context(conn, [])
+      assert span_context.trace_id == 61185
+      assert span_context.parent_id == 73456
+      assert span_context.priority == 0
+    end
+
+    test "returns a SpanContext struct with the parsed single b3 header" do
+      conn =
+        :get
+        |> Plug.Test.conn("/")
+        |> Plug.Conn.put_req_header("x-b3", "00ef01-011ef0-0")
+
+      assert {:ok, %SpanContext{} = span_context} = Adapter.distributed_context(conn, [])
+      assert span_context.trace_id == 61185
+      assert span_context.parent_id == 73456
+      assert span_context.priority == 0
+    end
+
     test "priority defaults to 1 (i.e. we currently assume all distributed traces should be kept)" do
       conn =
         :get
