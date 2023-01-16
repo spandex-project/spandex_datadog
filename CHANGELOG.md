@@ -1,9 +1,19 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-See [Conventional Commits](Https://conventionalcommits.org) for commit guidelines.
+## [1.3.0](https://github.com/spandex-project/spandex_datadog/compare/1.2.0...1.3.0) (2022-10-16)
 
-<!-- changelog -->
+## Features
+
+* Update supervision tree docs in README by @GregMefford in https://github.com/spandex-project/spandex_datadog/pull/46
+* Add rule_psr and limit_psr metrics to improve trace ingestion rate by @mrz in https://github.com/spandex-project/spandex_datadog/pull/45
+
+## Bug Fixes
+
+* Fix typos by @kianmeng in https://github.com/spandex-project/spandex_datadog/pull/48
+
+## New Contributors
+* @mrz made their first contribution in https://github.com/spandex-project/spandex_datadog/pull/45
+
 
 ## [1.2.0](https://github.com/spandex-project/spandex_datadog/compare/1.1.0...1.2.0) (2021-10-23)
 
