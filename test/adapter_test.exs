@@ -17,6 +17,7 @@ defmodule SpandexDatadog.Test.AdapterTest do
     Enum.each(spans, fn span ->
       assert span.service == :spandex_test
       assert span.meta.env == "test"
+      assert span.meta.version == "v1"
     end)
   end
 

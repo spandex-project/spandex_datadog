@@ -280,7 +280,8 @@ defmodule SpandexDatadog.ApiServer do
   @spec meta(Span.t()) :: map
   defp meta(span) do
     %{}
-    |> add_datadog_meta(span)
+    |> add_env_data(span)
+    |> add_version_data(span)
     |> add_error_data(span)
     |> add_http_data(span)
     |> add_sql_data(span)
@@ -289,11 +290,18 @@ defmodule SpandexDatadog.ApiServer do
     |> Enum.into(%{})
   end
 
-  @spec add_datadog_meta(map, Span.t()) :: map
-  defp add_datadog_meta(meta, %Span{env: nil}), do: meta
+  @spec add_env_data(map, Span.t()) :: map
+  defp add_env_data(meta, %Span{env: nil}), do: meta
 
-  defp add_datadog_meta(meta, %Span{env: env}) do
+  defp add_env_data(meta, %Span{env: env}) do
     Map.put(meta, :env, env)
+  end
+
+  @spec add_version_data(map, Span.t()) :: map
+  defp add_version_data(meta, %Span{service_version: nil}), do: meta
+
+  defp add_version_data(meta, %Span{service_version: version}) do
+    Map.put(meta, :version, version)
   end
 
   @spec add_error_data(map, Span.t()) :: map
