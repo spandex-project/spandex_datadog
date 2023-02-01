@@ -55,7 +55,9 @@ defmodule SpandexDatadog.Adapter do
   def distributed_context(headers, _opts) do
     trace_id = get_header(headers, "x-datadog-trace-id")
     parent_id = get_header(headers, "x-datadog-parent-id")
-    priority = get_header(headers, "x-datadog-sampling-priority") || 1
+
+    priority =
+      get_header(headers, "x-datadog-sampling-priority") || Application.get_env(:spandex_datadog, :default_priority, 1)
 
     if is_nil(trace_id) || is_nil(parent_id) do
       {:error, :no_distributed_trace}
