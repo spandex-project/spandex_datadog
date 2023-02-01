@@ -174,14 +174,23 @@ defmodule SpandexDatadog.ApiServer do
       resource: span.resource || span.name,
       service: span.service,
       type: span.type,
-      meta: meta(span),
-      metrics:
-        metrics(span, %{
-          _sampling_priority_v1: priority,
-          "_dd.rule_psr": 1.0,
-          "_dd.limit_psr": 1.0
-        })
+      meta: meta(span)
     }
+    |> then(fn data ->
+      if priority do
+        Map.put(
+          data,
+          :metrics,
+          metrics(span, %{
+            _sampling_priority_v1: priority,
+            "_dd.rule_psr": 1.0,
+            "_dd.limit_psr": 1.0
+          })
+        )
+      else
+        data
+      end
+    end)
   end
 
   # Private Helpers
