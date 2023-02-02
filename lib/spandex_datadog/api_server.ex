@@ -159,7 +159,7 @@ defmodule SpandexDatadog.ApiServer do
   @deprecated "Please use format/3 instead"
   @doc false
   @spec format(Span.t()) :: map()
-  def format(%Span{} = span), do: format(span, 1, [])
+  def format(%Span{} = span), do: format(span, Application.get_env(:spandex, :default_priority, 1), [])
 
   @spec format(Span.t(), integer(), Keyword.t()) :: map()
   def format(%Span{} = span, priority, _baggage) do
