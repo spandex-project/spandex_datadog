@@ -35,7 +35,11 @@ defmodule SpandexDatadog.ApiServer do
   # Same as HTTPoison.headers
   @type headers :: [{atom, binary}] | [{binary, binary}] | %{binary => binary} | any
 
-  @headers [{"Content-Type", "application/msgpack"}]
+  @headers [
+    {"Content-Type", "application/msgpack"},
+    {"Datadog-Meta-Lang", "elixir"},
+    {"Datadog-Meta-Lang-Version", System.version()}
+  ]
 
   @default_opts [
     host: "localhost",
