@@ -38,7 +38,8 @@ defmodule SpandexDatadog.ApiServer do
   @headers [
     {"Content-Type", "application/msgpack"},
     {"Datadog-Meta-Lang", "elixir"},
-    {"Datadog-Meta-Lang-Version", System.version()}
+    {"Datadog-Meta-Lang-Version", System.version()},
+    {"Datadog-Meta-Tracer-Version", Application.spec(:spandex_datadog)[:vsn]}
   ]
 
   @default_opts [
