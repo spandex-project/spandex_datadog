@@ -232,6 +232,9 @@ defmodule SpandexDatadog.ApiServerTest do
 
       headers = [
         {"Content-Type", "application/msgpack"},
+        {"Datadog-Meta-Lang", "elixir"},
+        {"Datadog-Meta-Lang-Version", System.version()},
+        {"Datadog-Meta-Tracer-Version", nil},
         {"X-Datadog-Trace-Count", 1}
       ]
 
