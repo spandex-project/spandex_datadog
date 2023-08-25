@@ -51,7 +51,7 @@ defmodule SpandexDatadog.ApiServerTest do
         name: "foo",
         trace_id: trace_id,
         completion_time: 1_527_752_052_216_578_000,
-        tags: [foo: "123", bar: 321, buz: :blitz, baz: {1, 2}, zyx: [xyz: {1, 2}]]
+        tags: [is_foo: true, foo: "123", bar: 321, buz: :blitz, baz: {1, 2}, zyx: [xyz: {1, 2}]]
       )
 
     {:ok, span_2} =
@@ -176,6 +176,7 @@ defmodule SpandexDatadog.ApiServerTest do
             "buz" => "blitz",
             "env" => "local",
             "foo" => "123",
+            "is_foo" => "true",
             "version" => "v1",
             "zyx" => "[xyz: {1, 2}]"
           },
@@ -267,6 +268,7 @@ defmodule SpandexDatadog.ApiServerTest do
             "buz" => "blitz",
             "env" => "local",
             "foo" => "123",
+            "is_foo" => "true",
             "version" => "v1",
             "zyx" => "[xyz: {1, 2}]"
           },
