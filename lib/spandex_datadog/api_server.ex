@@ -314,14 +314,21 @@ defmodule SpandexDatadog.ApiServer do
 
   defp add_error_data(meta, %{error: error}) do
     meta
-    |> add_error_type(error[:exception])
+    |> add_error_kind(error[:exception])
     |> add_error_message(error[:exception])
     |> add_error_stacktrace(error[:stacktrace])
   end
 
-  @spec add_error_type(map, Exception.t() | nil) :: map
-  defp add_error_type(meta, %struct{}), do: Map.put(meta, "error.type", struct)
-  defp add_error_type(meta, _), do: meta
+  @spec add_error_kind(map, Exception.t() | nil) :: map
+  defp add_error_kind(meta, %struct{}) do
+    meta
+    # set 'error.type' for backward compatibility reasons
+    # the value that datadog expects is 'error.kind'
+    |> Map.put("error.type", struct)
+    |> Map.put("error.kind", struct)
+  end
+
+  defp add_error_kind(meta, _), do: meta
 
   @spec add_error_message(map, Exception.t() | nil) :: map
   defp add_error_message(meta, nil), do: meta
