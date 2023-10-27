@@ -128,7 +128,10 @@ defmodule SpandexDatadog.Test.AdapterTest do
       assert span_context.priority == 2
     end
 
-    test "priority defaults to 1 (i.e. we currently assume all distributed traces should be kept)" do
+    # for traces that are not explicitly started but rather are continued from a distributed context
+    # we rather default to a priority of 1. because the real reason for the lack of sampling is in the upstream
+    # and a default like that is both safer and makes it noticeable that the configuration might be wrong
+    test "priority defaults to 1" do
       headers = %{
         "x-datadog-trace-id" => "123",
         "x-datadog-parent-id" => "456"

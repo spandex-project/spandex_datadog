@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.0](https://github.com/spandex-project/spandex_datadog/compare/1.4.0...1.5.0) (2023-10-30)
+
+## Features
+* Add a sampling strategy that calculates trace priority based on datadog agent's rates by @JerzyDziala in https://github.com/surgeventures/spandex_datadog/pull/1
+
 ## [1.4.0](https://github.com/spandex-project/spandex_datadog/compare/1.3.0...1.4.0) (2023-08-26)
 
 ## Features
