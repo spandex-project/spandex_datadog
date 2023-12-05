@@ -11,7 +11,7 @@ defmodule SpandexDatadog.Test.Support.TestApiServer do
     send(self(), {:sent_datadog_spans, format(trace)})
   end
 
-  defp format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
-    Enum.map(spans, fn span -> ApiServer.format(span, priority, baggage) end)
+  defp format(%Trace{spans: spans, sampling: sampling, baggage: baggage}) do
+    Enum.map(spans, fn span -> ApiServer.format(span, sampling, baggage) end)
   end
 end

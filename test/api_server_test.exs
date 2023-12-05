@@ -9,17 +9,18 @@ defmodule SpandexDatadog.ApiServerTest do
   }
 
   alias SpandexDatadog.ApiServer
+  alias SpandexDatadog.DatadogConstants
 
   defmodule TestOkApiServer do
     def put(url, body, headers) do
       send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
-      {:ok, %HTTPoison.Response{status_code: 200, body: Msgpax.pack!(%{rate_by_service: %{"service:env:": 0.5}})}}
+      {:ok, %HTTPoison.Response{status_code: 200, body: Jason.encode!(%{rate_by_service: %{"service:env:": 0.5}})}}
     end
   end
 
   defmodule TestOkApiServerAsync do
     def put(_url, _body, _headers) do
-      {:ok, %HTTPoison.Response{status_code: 200, body: Msgpax.pack!(%{rate_by_service: %{"service:env:": 0.5}})}}
+      {:ok, %HTTPoison.Response{status_code: 200, body: Jason.encode!(%{rate_by_service: %{"service:env:": 0.5}})}}
     end
   end
 
@@ -90,13 +91,20 @@ defmodule SpandexDatadog.ApiServerTest do
         tags: [analytics_event: true]
       )
 
-    trace = %Trace{spans: [span_1, span_2, span_3]}
+    trace = %Trace{
+      spans: [span_1, span_2, span_3],
+      sampling: %{
+        priority: DatadogConstants.sampling_priority()[:USER_KEEP],
+        sampling_rate_used: 0.5,
+        sampling_mechanism_used: DatadogConstants.sampling_mechanism_used()[:AGENT]
+      }
+    }
 
     {
       :ok,
       [
         trace: trace,
-        url: "localhost:8126/v0.3/traces",
+        url: "localhost:8126/v0.4/traces",
         state: %ApiServer.State{
           asynchronous_send?: false,
           host: "localhost",
@@ -184,6 +192,7 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000,
           "error" => 0,
           "meta" => %{
+            "_dd.p.dm" => "1",
             "bar" => "321",
             "baz" => "{1, 2}",
             "buz" => "blitz",
@@ -194,7 +203,8 @@ defmodule SpandexDatadog.ApiServerTest do
             "zyx" => "[xyz: {1, 2}]"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "foo",
           "resource" => "foo",
@@ -207,10 +217,12 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
+            "_dd.p.dm" => "1",
             "env" => "local"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -223,11 +235,13 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
+            "_dd.p.dm" => "1",
             "env" => "local",
             "_dd1.sr.eausr" => 1
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -286,10 +300,12 @@ defmodule SpandexDatadog.ApiServerTest do
             "foo" => "123",
             "is_foo" => "true",
             "version" => "v1",
-            "zyx" => "[xyz: {1, 2}]"
+            "zyx" => "[xyz: {1, 2}]",
+            "_dd.p.dm" => "1"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "foo",
           "resource" => "foo",
@@ -302,10 +318,12 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
-            "env" => "local"
+            "env" => "local",
+            "_dd.p.dm" => "1"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -319,10 +337,12 @@ defmodule SpandexDatadog.ApiServerTest do
           "error" => 0,
           "meta" => %{
             "env" => "local",
+            "_dd.p.dm" => "1",
             "_dd1.sr.eausr" => 1
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",

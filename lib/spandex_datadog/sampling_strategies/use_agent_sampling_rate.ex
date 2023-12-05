@@ -9,22 +9,29 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRate do
   We keep the current advised sampling rate in the process dictionary and use that to calculate the priority.
   """
 
-  @behaviour Spandex.SamplingStrategy
+  alias SpandexDatadog.DatadogConstants
 
-  @keep_all_traces 1
+  @behaviour Spandex.SamplingStrategy
 
   @max_uint64 18_446_744_073_709_551_615
   @knuth_factor 111_111_111_111_111_1111
 
   @impl true
-  def calculate_priority(trace_id, opts \\ []) do
-    sample_rate = get_sampling_rate(opts)
+  def calculate_sampling(trace_id, opts \\ []) do
+    sampling_rate = get_sampling_rate(opts)
 
-    threshold = trunc(sample_rate * @max_uint64)
+    threshold = trunc(sampling_rate * @max_uint64)
 
-    if rem(trace_id * @knuth_factor, @max_uint64) <= threshold,
-      do: 1,
-      else: 0
+    priority =
+      if rem(trace_id * @knuth_factor, @max_uint64) <= threshold,
+        do: DatadogConstants.sampling_priority()[:AUTO_KEEP],
+        else: DatadogConstants.sampling_priority()[:AUTO_REJECT]
+
+    %{
+      priority: priority,
+      sampling_rate_used: sampling_rate,
+      sampling_mechanism_used: DatadogConstants.sampling_mechanism_used()[:AGENT]
+    }
   end
 
   defp get_sampling_rate(opts) do
@@ -32,7 +39,8 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRate do
     |> do_get_sampling_rate(opts)
   end
 
-  defp do_get_sampling_rate(nil, _opts), do: @keep_all_traces
+  # keep all traces
+  defp do_get_sampling_rate(nil, _opts), do: 1
 
   defp do_get_sampling_rate(rates, opts) do
     service = Keyword.get(opts, :service)
@@ -41,7 +49,8 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRate do
     with nil <- Map.get(rates, "service:#{service},env:#{env}"),
          nil <- Map.get(rates, "service:#{service},env:"),
          nil <- Map.get(rates, "service:,env:") do
-      @keep_all_traces
+      # keep_all_traces
+      1
     else
       sampling_rate -> sampling_rate
     end

@@ -1,8 +1,18 @@
 defmodule SpandexDatadog.SamplingStrategies.KeepAll do
-  @moduledoc "This sampling strategy simply sets the priority to 1 for all traces."
+  @moduledoc """
+  A Sampling strategy that keeps all traces.
+  """
+
+  alias SpandexDatadog.DatadogConstants
 
   @behaviour Spandex.SamplingStrategy
 
   @impl true
-  def calculate_priority(_trace_id, _opts \\ []), do: 1
+  def calculate_sampling(_span, _opts \\ []) do
+    %{
+      priority: DatadogConstants.sampling_priority()[:AUTO_KEEP],
+      sampling_rate_used: 1.0,
+      sampling_mechanism_used: DatadogConstants.sampling_mechanism_used()[:DEFAULT]
+    }
+  end
 end

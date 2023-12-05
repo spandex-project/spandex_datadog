@@ -219,8 +219,8 @@ defmodule SpandexDatadog.ApiServer do
   @deprecated "Please use format/3 instead"
   @doc false
   @spec format(Trace.t()) :: map()
-  def format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
-    Enum.map(spans, fn span -> format(span, priority, baggage) end)
+  def format(%Trace{spans: spans, sampling: sampling, baggage: baggage}) do
+    Enum.map(spans, fn span -> format(span, sampling, baggage) end)
   end
 
   @deprecated "Please use format/3 instead"
@@ -229,7 +229,7 @@ defmodule SpandexDatadog.ApiServer do
   def format(%Span{} = span), do: format(span, 1, [])
 
   @spec format(Span.t(), integer(), Keyword.t()) :: map()
-  def format(%Span{} = span, priority, _baggage) do
+  def format(%Span{} = span, sampling, _baggage) do
     %{
       trace_id: span.trace_id,
       span_id: span.id,
@@ -268,15 +268,22 @@ defmodule SpandexDatadog.ApiServer do
               nil -> nil
               stacktrace -> Exception.format_stacktrace(stacktrace)
             end,
+          "_dd.p.dm" =>
+            case sampling[:sampling_mechanism_used] do
+              nil -> nil
+              mechanism -> to_string(mechanism)
+            end,
           env: span.env,
           version: span.service_version
         }
         |> add_analytics_sample_rate(span)
         |> add_tags(span),
       metrics: %{
-        _sampling_priority_v1: priority
+        "_dd.agent_psr" => sampling[:sampling_rate_used],
+        _sampling_priority_v1: sampling[:priority]
       }
     }
+    |> IO.inspect()
   end
 
   # Private Helpers
@@ -358,7 +365,7 @@ defmodule SpandexDatadog.ApiServer do
   defp add_analytics_sample_rate(metrics, %{tags: tags}) do
     case Keyword.get(tags, :analytics_event) do
       nil -> metrics
-      event -> Map.merge(metrics, %{"_dd1.sr.eausr" => 1})
+      _event -> Map.merge(metrics, %{"_dd1.sr.eausr" => 1})
     end
   end
 

@@ -55,7 +55,7 @@ defmodule SpandexDatadog.MixProject do
       {:jason, "~> 1.2"},
       # Im going to merge the spandex PR first
       # This is just for me for development
-      {:spandex, path: "../spandex"},
+      {:spandex, path: "../spandex", override: true},
       {:telemetry, "~> 0.4.2 or ~> 1.0"},
       # Dev- and test-only deps
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
