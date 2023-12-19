@@ -53,9 +53,7 @@ defmodule SpandexDatadog.MixProject do
     [
       {:msgpax, "~> 2.2.1 or ~> 2.3"},
       {:jason, "~> 1.2"},
-      # Im going to merge the spandex PR first
-      # This is just for me for development
-      {:spandex, path: "../spandex", override: true},
+      {:spandex, github: "surgeventures/spandex", commit: "af9e149e56d87a9abccc076d3cab9722be4d9ec4"},
       {:telemetry, "~> 0.4.2 or ~> 1.0"},
       # Dev- and test-only deps
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
