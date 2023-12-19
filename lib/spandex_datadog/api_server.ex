@@ -283,7 +283,6 @@ defmodule SpandexDatadog.ApiServer do
         _sampling_priority_v1: sampling[:priority]
       }
     }
-    |> IO.inspect()
   end
 
   # Private Helpers
