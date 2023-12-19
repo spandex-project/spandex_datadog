@@ -49,6 +49,7 @@ defmodule SpandexDatadog.ApiServer do
     verbose?: false,
     batch_size: 10,
     sync_threshold: 20,
+    asynchronous_send?: true,
     trap_exits?: false,
     name: __MODULE__,
     api_adapter: SpandexDatadog.ApiServer
@@ -67,6 +68,7 @@ defmodule SpandexDatadog.ApiServer do
   * `:sync_threshold` - The maximum number of processes that may be sending traces at any one time. This adds backpressure. Defaults to `20`.
   * `:name` - The name the GenServer should have. Currently only used for testing. Defaults to `SpandexDatadog.ApiServer`
   * `:trap_exits?` - Whether or not to trap exits and attempt to flush traces on shutdown, defaults to `false`. Useful if you do frequent deploys and you don't want to lose traces each deploy.
+  * `:asynchronous_send?` - Whether or not to send traces asynchronously. Defaults to `true`. Should really only ever be set to `false` in some tests.
   """
   @spec start_link(opts :: Keyword.t()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -82,10 +84,15 @@ defmodule SpandexDatadog.ApiServer do
       Process.flag(:trap_exit, true)
     end
 
-    {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
+    {:ok, agent_pid} =
+      Agent.start_link(fn ->
+        %{
+          unsynced_traces: 0,
+          sampling_rates: nil
+        }
+      end)
 
     state = %State{
-      asynchronous_send?: true,
       host: opts[:host],
       port: opts[:port],
       verbose?: opts[:verbose?],
@@ -93,6 +100,7 @@ defmodule SpandexDatadog.ApiServer do
       waiting_traces: [],
       batch_size: opts[:batch_size],
       sync_threshold: opts[:sync_threshold],
+      asynchronous_send?: opts[:asynchronous_send?],
       agent_pid: agent_pid,
       container_id: get_container_id()
     }
@@ -135,6 +143,17 @@ defmodule SpandexDatadog.ApiServer do
     trace = %Trace{spans: spans}
     genserver_name = Keyword.get(opts, :name, __MODULE__)
     GenServer.call(genserver_name, {:send_trace, trace}, timeout)
+  end
+
+  def get_sampling_rates(opts \\ []) do
+    genserver_name = Keyword.get(opts, :name, __MODULE__)
+    GenServer.call(genserver_name, :get_sampling_rates)
+  end
+
+  def handle_call(:get_sampling_rates, _from, state) do
+    sampling_rates = Agent.get(state.agent_pid, fn agent_state -> agent_state.sampling_rates end)
+
+    {:reply, sampling_rates, state}
   end
 
   @doc false
@@ -181,6 +200,15 @@ defmodule SpandexDatadog.ApiServer do
       |> encode()
       |> push(headers, state)
 
+    with {:ok, %{status_code: 200, body: body}} <- response,
+         {:ok, sampling_rates} <- Jason.decode(body) do
+      Agent.update(state.agent_pid, fn agent_state ->
+        Map.put(agent_state, :sampling_rates, sampling_rates["rate_by_service"])
+      end)
+    else
+      _ -> Logger.warn(fn -> "Failed to send traces and update the sampling rates: #{inspect(response)}" end)
+    end
+
     if verbose? do
       Logger.debug(fn -> "Trace response: #{inspect(response)}" end)
     end
@@ -191,8 +219,8 @@ defmodule SpandexDatadog.ApiServer do
   @deprecated "Please use format/3 instead"
   @doc false
   @spec format(Trace.t()) :: map()
-  def format(%Trace{spans: spans, priority: priority, baggage: baggage}) do
-    Enum.map(spans, fn span -> format(span, priority, baggage) end)
+  def format(%Trace{spans: spans, sampling: sampling, baggage: baggage}) do
+    Enum.map(spans, fn span -> format(span, sampling, baggage) end)
   end
 
   @deprecated "Please use format/3 instead"
@@ -201,7 +229,7 @@ defmodule SpandexDatadog.ApiServer do
   def format(%Span{} = span), do: format(span, 1, [])
 
   @spec format(Span.t(), integer(), Keyword.t()) :: map()
-  def format(%Span{} = span, priority, _baggage) do
+  def format(%Span{} = span, sampling, _baggage) do
     %{
       trace_id: span.trace_id,
       span_id: span.id,
@@ -213,13 +241,47 @@ defmodule SpandexDatadog.ApiServer do
       resource: span.resource || span.name,
       service: span.service,
       type: span.type,
-      meta: meta(span),
-      metrics:
-        metrics(span, %{
-          _sampling_priority_v1: priority,
-          "_dd.rule_psr": 1.0,
-          "_dd.limit_psr": 1.0
-        })
+      meta:
+        %{
+          "sql.query" => get_in(span, [Access.key(:sql_query), :query]),
+          "sql.rows" => get_in(span, [Access.key(:sql_query), :rows]),
+          "sql.db" => get_in(span, [Access.key(:sql_query), :db]),
+          "http.url" => get_in(span, [Access.key(:http), :url]),
+          "http.method" => get_in(span, [Access.key(:http), :method]),
+          "http.status_code" =>
+            case get_in(span, [Access.key(:http), :status_code]) do
+              nil -> nil
+              status_code -> to_string(status_code)
+            end,
+          "error.type" =>
+            case get_in(span, [Access.key(:error), :exception]) do
+              nil -> nil
+              %exception{} -> exception
+            end,
+          "error.msg" =>
+            case get_in(span, [Access.key(:error), :exception]) do
+              nil -> nil
+              exception -> Exception.message(exception)
+            end,
+          "error.stack" =>
+            case get_in(span, [Access.key(:error), :stacktrace]) do
+              nil -> nil
+              stacktrace -> Exception.format_stacktrace(stacktrace)
+            end,
+          "_dd.p.dm" =>
+            case sampling[:sampling_mechanism_used] do
+              nil -> nil
+              mechanism -> to_string(mechanism)
+            end,
+          env: span.env,
+          version: span.service_version
+        }
+        |> add_analytics_sample_rate(span)
+        |> add_tags(span),
+      metrics: %{
+        "_dd.agent_psr" => sampling[:sampling_rate_used],
+        _sampling_priority_v1: sampling[:priority]
+      }
     }
   end
 
@@ -256,7 +318,7 @@ defmodule SpandexDatadog.ApiServer do
           try do
             send_and_log(traces, state)
           after
-            Agent.update(state.agent_pid, fn count -> count - 1 end)
+            Agent.update(state.agent_pid, &Map.put(&1, :unsynced_traces, &1.unsynced_traces - 1))
           end
         end)
       else
@@ -273,91 +335,13 @@ defmodule SpandexDatadog.ApiServer do
   end
 
   defp below_sync_threshold?(state) do
-    Agent.get_and_update(state.agent_pid, fn count ->
-      if count < state.sync_threshold do
-        {true, count + 1}
+    Agent.get_and_update(state.agent_pid, fn agent_state ->
+      if agent_state.unsynced_traces < state.sync_threshold do
+        {true, Map.put(agent_state, :unsynced_traces, agent_state.unsynced_traces + 1)}
       else
-        {false, count}
+        {false, agent_state}
       end
     end)
-  end
-
-  @spec meta(Span.t()) :: map
-  defp meta(span) do
-    %{}
-    |> add_env_data(span)
-    |> add_version_data(span)
-    |> add_error_data(span)
-    |> add_http_data(span)
-    |> add_sql_data(span)
-    |> add_tags(span)
-    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-    |> Enum.into(%{})
-  end
-
-  @spec add_env_data(map, Span.t()) :: map
-  defp add_env_data(meta, %Span{env: nil}), do: meta
-
-  defp add_env_data(meta, %Span{env: env}) do
-    Map.put(meta, :env, env)
-  end
-
-  @spec add_version_data(map, Span.t()) :: map
-  defp add_version_data(meta, %Span{service_version: nil}), do: meta
-
-  defp add_version_data(meta, %Span{service_version: version}) do
-    Map.put(meta, :version, version)
-  end
-
-  @spec add_error_data(map, Span.t()) :: map
-  defp add_error_data(meta, %{error: nil}), do: meta
-
-  defp add_error_data(meta, %{error: error}) do
-    meta
-    |> add_error_type(error[:exception])
-    |> add_error_message(error[:exception])
-    |> add_error_stacktrace(error[:stacktrace])
-  end
-
-  @spec add_error_type(map, Exception.t() | nil) :: map
-  defp add_error_type(meta, %struct{}), do: Map.put(meta, "error.type", struct)
-  defp add_error_type(meta, _), do: meta
-
-  @spec add_error_message(map, Exception.t() | nil) :: map
-  defp add_error_message(meta, nil), do: meta
-
-  defp add_error_message(meta, exception),
-    do: Map.put(meta, "error.msg", Exception.message(exception))
-
-  @spec add_error_stacktrace(map, list | nil) :: map
-  defp add_error_stacktrace(meta, nil), do: meta
-
-  defp add_error_stacktrace(meta, stacktrace),
-    do: Map.put(meta, "error.stack", Exception.format_stacktrace(stacktrace))
-
-  @spec add_http_data(map, Span.t()) :: map
-  defp add_http_data(meta, %{http: nil}), do: meta
-
-  defp add_http_data(meta, %{http: http}) do
-    status_code =
-      if http[:status_code] do
-        to_string(http[:status_code])
-      end
-
-    meta
-    |> Map.put("http.url", http[:url])
-    |> Map.put("http.status_code", status_code)
-    |> Map.put("http.method", http[:method])
-  end
-
-  @spec add_sql_data(map, Span.t()) :: map
-  defp add_sql_data(meta, %{sql_query: nil}), do: meta
-
-  defp add_sql_data(meta, %{sql_query: sql}) do
-    meta
-    |> Map.put("sql.query", sql[:query])
-    |> Map.put("sql.rows", sql[:rows])
-    |> Map.put("sql.db", sql[:db])
   end
 
   @spec add_tags(map, Span.t()) :: map
@@ -374,27 +358,13 @@ defmodule SpandexDatadog.ApiServer do
     )
   end
 
-  @spec metrics(Span.t(), map) :: map
-  defp metrics(span, initial_value = %{}) do
-    initial_value
-    |> add_metrics(span)
-    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-    |> Enum.into(%{})
-  end
+  @spec add_analytics_sample_rate(map, Span.t()) :: map
+  defp add_analytics_sample_rate(metrics, %{tags: nil}), do: metrics
 
-  @spec add_metrics(map, Span.t()) :: map
-  defp add_metrics(metrics, %{tags: nil}), do: metrics
-
-  defp add_metrics(metrics, %{tags: tags}) do
-    with analytics_event <- tags |> Keyword.get(:analytics_event),
-         true <- analytics_event != nil do
-      Map.merge(
-        metrics,
-        %{"_dd1.sr.eausr" => 1}
-      )
-    else
-      _ ->
-        metrics
+  defp add_analytics_sample_rate(metrics, %{tags: tags}) do
+    case Keyword.get(tags, :analytics_event) do
+      nil -> metrics
+      _event -> Map.merge(metrics, %{"_dd1.sr.eausr" => 1})
     end
   end
 
@@ -415,7 +385,7 @@ defmodule SpandexDatadog.ApiServer do
 
   @spec push(body :: iodata(), headers, State.t()) :: any()
   defp push(body, headers, %State{http: http, host: host, port: port}),
-    do: http.put("#{host}:#{port}/v0.3/traces", body, headers)
+    do: http.put("#{host}:#{port}/v0.4/traces", body, headers)
 
   @spec deep_remove_nils(term) :: term
   defp deep_remove_nils(term) when is_map(term) do
