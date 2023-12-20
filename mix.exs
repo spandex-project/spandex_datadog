@@ -53,7 +53,7 @@ defmodule SpandexDatadog.MixProject do
     [
       {:msgpax, "~> 2.2.1 or ~> 2.3"},
       {:jason, "~> 1.2"},
-      {:spandex, github: "surgeventures/spandex", commit: "af9e149e56d87a9abccc076d3cab9722be4d9ec4"},
+      {:spandex, github: "surgeventures/spandex", commit: "1af5f8aa98c9b2ca576d435b3b6ff80baa3ca25a"},
       {:telemetry, "~> 0.4.2 or ~> 1.0"},
       # Dev- and test-only deps
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
