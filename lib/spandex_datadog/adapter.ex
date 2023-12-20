@@ -64,6 +64,12 @@ defmodule SpandexDatadog.Adapter do
     end
   end
 
+  @impl Spandex.Adapter
+  @spec default_sampling_strategy() :: Spandex.SamplingStrategy.t()
+  def default_sampling_strategy() do
+    SpandexDatadog.SamplingStrategies.KeepAll
+  end
+
   @doc """
   Injects Datadog-specific HTTP headers to represent the specified SpanContext
   """

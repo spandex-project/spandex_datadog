@@ -9,11 +9,18 @@ defmodule SpandexDatadog.ApiServerTest do
   }
 
   alias SpandexDatadog.ApiServer
+  alias SpandexDatadog.DatadogConstants
 
   defmodule TestOkApiServer do
     def put(url, body, headers) do
       send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
-      {:ok, %HTTPoison.Response{status_code: 200}}
+      {:ok, %HTTPoison.Response{status_code: 200, body: Jason.encode!(%{rate_by_service: %{"service:env:": 0.5}})}}
+    end
+  end
+
+  defmodule TestOkApiServerAsync do
+    def put(_url, _body, _headers) do
+      {:ok, %HTTPoison.Response{status_code: 200, body: Jason.encode!(%{rate_by_service: %{"service:env:": 0.5}})}}
     end
   end
 
@@ -38,7 +45,14 @@ defmodule SpandexDatadog.ApiServerTest do
   end
 
   setup_all do
-    {:ok, agent_pid} = Agent.start_link(fn -> 0 end)
+    {:ok, agent_pid} =
+      Agent.start_link(fn ->
+        %{
+          unsynced_traces: 0,
+          sampling_rates: nil
+        }
+      end)
+
     trace_id = 4_743_028_846_331_200_905
 
     {:ok, span_1} =
@@ -77,13 +91,20 @@ defmodule SpandexDatadog.ApiServerTest do
         tags: [analytics_event: true]
       )
 
-    trace = %Trace{spans: [span_1, span_2, span_3]}
+    trace = %Trace{
+      spans: [span_1, span_2, span_3],
+      sampling: %{
+        priority: DatadogConstants.sampling_priority()[:USER_KEEP],
+        sampling_rate_used: 0.5,
+        sampling_mechanism_used: DatadogConstants.sampling_mechanism_used()[:AGENT]
+      }
+    }
 
     {
       :ok,
       [
         trace: trace,
-        url: "localhost:8126/v0.3/traces",
+        url: "localhost:8126/v0.4/traces",
         state: %ApiServer.State{
           asynchronous_send?: false,
           host: "localhost",
@@ -171,6 +192,7 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000,
           "error" => 0,
           "meta" => %{
+            "_dd.p.dm" => "1",
             "bar" => "321",
             "baz" => "{1, 2}",
             "buz" => "blitz",
@@ -181,9 +203,8 @@ defmodule SpandexDatadog.ApiServerTest do
             "zyx" => "[xyz: {1, 2}]"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "foo",
           "resource" => "foo",
@@ -196,12 +217,12 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
+            "_dd.p.dm" => "1",
             "env" => "local"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -214,13 +235,13 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
-            "env" => "local"
+            "_dd.p.dm" => "1",
+            "env" => "local",
+            "_dd1.sr.eausr" => 1
           },
           "metrics" => %{
-            "_dd1.sr.eausr" => 1,
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -242,13 +263,17 @@ defmodule SpandexDatadog.ApiServerTest do
       assert_received {:put_datadog_spans, ^formatted, ^url, ^headers}
     end
 
-    test "doesn't care about the response result", %{trace: trace, state: state, url: url} do
+    test "warns about errors in the response because it's used to update sampling rates", %{
+      trace: trace,
+      state: state,
+      url: url
+    } do
       state =
         state
         |> Map.put(:verbose?, true)
         |> Map.put(:http, TestErrorApiServer)
 
-      [enqueue, processing, received_spans, response] =
+      [enqueue, processing, received_spans, failure_log, response] =
         capture_log(fn ->
           {:reply, :ok, _} = ApiServer.handle_call({:send_trace, trace}, self(), state)
         end)
@@ -260,6 +285,8 @@ defmodule SpandexDatadog.ApiServerTest do
       assert processing =~ ~r/Sending 1 traces, 3 spans/
 
       assert received_spans =~ ~r/Trace: \[%Spandex.Trace{/
+
+      assert failure_log =~ ~r/Failed to send traces and update the sampling rates/
 
       formatted = [
         %{
@@ -273,12 +300,12 @@ defmodule SpandexDatadog.ApiServerTest do
             "foo" => "123",
             "is_foo" => "true",
             "version" => "v1",
-            "zyx" => "[xyz: {1, 2}]"
+            "zyx" => "[xyz: {1, 2}]",
+            "_dd.p.dm" => "1"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "foo",
           "resource" => "foo",
@@ -291,12 +318,12 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
-            "env" => "local"
+            "env" => "local",
+            "_dd.p.dm" => "1"
           },
           "metrics" => %{
-            "_sampling_priority_v1" => 1,
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -309,13 +336,13 @@ defmodule SpandexDatadog.ApiServerTest do
           "duration" => 100_000_000,
           "error" => 0,
           "meta" => %{
-            "env" => "local"
+            "env" => "local",
+            "_dd.p.dm" => "1",
+            "_dd1.sr.eausr" => 1
           },
           "metrics" => %{
-            "_dd.rule_psr" => 1.0,
-            "_dd.limit_psr" => 1.0,
-            "_dd1.sr.eausr" => 1,
-            "_sampling_priority_v1" => 1
+            "_dd.agent_psr" => 0.5,
+            "_sampling_priority_v1" => 2
           },
           "name" => "bar",
           "resource" => "bar",
@@ -328,6 +355,16 @@ defmodule SpandexDatadog.ApiServerTest do
 
       assert response =~ ~r/Trace response: {:error, %HTTPoison.Error{id: :foo, reason: :bar}}/
       assert_received {:put_datadog_spans, ^formatted, ^url, _}
+    end
+
+    test "sending the traces stores the sampling rates that can then be fetched", %{trace: trace} do
+      ApiServer.start_link(http: TestOkApiServerAsync, batch_size: 1, asynchronous_send?: false)
+
+      :ok = ApiServer.send_trace(trace)
+
+      sampling_rates = ApiServer.get_sampling_rates()
+
+      assert sampling_rates == %{"service:env:" => 0.5}
     end
   end
 end

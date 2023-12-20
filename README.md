@@ -16,7 +16,7 @@ dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:spandex_datadog, "~> 1.4"}
+    {:spandex_datadog, "~> 1.5"}
   ]
 end
 ```
@@ -57,8 +57,10 @@ Distributed tracing is supported via headers `x-datadog-trace-id`,
 `x-datadog-parent-id`, and `x-datadog-sampling-priority`. If they are set, the
 `Spandex.Plug.StartTrace` plug will act accordingly, continuing that trace and
 span instead of starting a new one.  *Both* `x-datadog-trace-id` and
-`x-datadog-parent-id` must be set for distributed tracing to work. You can
-learn more about the behavior of `x-datadog-sampling-priority` in the [Datadog
+`x-datadog-parent-id` must be set for distributed tracing to work. 
+This package defines two sampling strategies. A default `KeepAll` strategy
+and a `UseAgentSamplingRate` strategy that applies the rates that the Datadog agent calculates.
+You can learn more about the behavior of `x-datadog-sampling-priority` in the [Datadog
 priority sampling documentation].
 
 [Datadog priority sampling documentation]: https://docs.datadoghq.com/tracing/getting_further/trace_sampling_and_storage/#priority-sampling-for-distributed-tracing

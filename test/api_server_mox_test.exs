@@ -35,7 +35,7 @@ defmodule SpandexDatadog.ApiServerMoxTest do
 
     # expect a put request to send the traces out
     HTTPoisonMock
-    |> expect(:put, fn "localhost:8126/v0.3/traces", _body, _options ->
+    |> expect(:put, fn "localhost:8126/v0.4/traces", _body, _options ->
       send(test_pid, :http_put_finished)
       {:ok, %HTTPoison.Response{}}
     end)
@@ -65,7 +65,7 @@ defmodule SpandexDatadog.ApiServerMoxTest do
 
     # shut our ApiServer down and expect a final http_put to flush any traces left in the batch
     HTTPoisonMock
-    |> expect(:put, fn "localhost:8126/v0.3/traces", _body, _options ->
+    |> expect(:put, fn "localhost:8126/v0.4/traces", _body, _options ->
       send(test_pid, :http_put_finished)
       {:ok, %HTTPoison.Response{}}
     end)
@@ -97,7 +97,7 @@ defmodule SpandexDatadog.ApiServerMoxTest do
 
     # shut our ApiServer down and expect a final http_put to flush any traces left in the batch
     HTTPoisonMock
-    |> expect(:put, fn "localhost:8126/v0.3/traces", _body, _options ->
+    |> expect(:put, fn "localhost:8126/v0.4/traces", _body, _options ->
       send(test_pid, :http_put_finished)
       {:ok, %HTTPoison.Response{}}
     end)
@@ -128,7 +128,7 @@ defmodule SpandexDatadog.ApiServerMoxTest do
 
     # shut our ApiServer down and stup http put for testing
     HTTPoisonMock
-    |> stub(:put, fn "localhost:8126/v0.3/traces", _body, _options ->
+    |> stub(:put, fn "localhost:8126/v0.4/traces", _body, _options ->
       send(test_pid, :http_put_finished)
       {:ok, %HTTPoison.Response{}}
     end)
