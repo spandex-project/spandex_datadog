@@ -1,7 +1,7 @@
 defmodule SpandexDatadog.MixProject do
   use Mix.Project
 
-  @source_url "https://github.com/spandex-project/spandex_datadog"
+  @source_url "https://github.com/surgeventures/spandex_datadog"
   @version "1.5.0"
 
   def project do
@@ -26,11 +26,12 @@ defmodule SpandexDatadog.MixProject do
 
   defp package do
     [
-      name: :spandex_datadog,
+      name: :spandex_datadog_fresha,
+      organization: "fresha",
       maintainers: ["Greg Mefford"],
       licenses: ["MIT"],
       links: %{
-        "Changelog" => "https://hexdocs.pm/spandex_datadog/changelog.html",
+        "Changelog" => "https://hexdocs.pm/spandex_datadog_fresha/changelog.html",
         "GitHub" => @source_url,
         "Sponsor" => "https://github.com/sponsors/GregMefford"
       }
