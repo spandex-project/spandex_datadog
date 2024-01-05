@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.0](https://github.com/spandex-project/spandex_datadog/compare/1.5.0...surgeventures:spandex_datadog:v1.6.0) (2024-01-05)
+
+## Features
+* Add local sampling rate based strategy by @JerzyDziala in https://github.com/surgeventures/spandex_datadog/pull/2
+
 ## [1.5.0](https://github.com/spandex-project/spandex_datadog/compare/1.4.0...surgeventures:spandex_datadog:v1.5.0) (2023-10-30)
 
 ## Features
