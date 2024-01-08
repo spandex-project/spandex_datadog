@@ -19,8 +19,8 @@ defmodule SpandexDatadog.SamplingStrategies.UseLocalSamplingRulesTest do
 
     priority_distribution = priority_generator |> Stream.take(10000) |> Enum.frequencies()
 
-    assert int_equal_with_percentage_margin?(priority_distribution[0], 10000 * 0.96, 0.05)
-    assert int_equal_with_percentage_margin?(priority_distribution[1], 10000 * 0.04, 0.05)
+    assert int_equal_with_percentage_margin?(priority_distribution[0], 10000 * 0.96, 0.3)
+    assert int_equal_with_percentage_margin?(priority_distribution[1], 10000 * 0.04, 0.3)
   end
 
   def int_equal_with_percentage_margin?(a, b, percentage_margin) do

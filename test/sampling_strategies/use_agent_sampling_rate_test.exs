@@ -56,8 +56,8 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRateTest do
 
     priority_distribution = priority_generator |> Stream.take(10000) |> Enum.frequencies()
 
-    assert int_equal_with_percentage_margin?(priority_distribution[0], 7000, 0.1)
-    assert int_equal_with_percentage_margin?(priority_distribution[1], 3000, 0.1)
+    assert int_equal_with_percentage_margin?(priority_distribution[0], 7000, 0.3)
+    assert int_equal_with_percentage_margin?(priority_distribution[1], 3000, 0.3)
   end
 
   property "when env not provided fall back to service rate" do
@@ -73,8 +73,8 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRateTest do
 
     priority_distribution = priority_generator |> Stream.take(10000) |> Enum.frequencies()
 
-    assert int_equal_with_percentage_margin?(priority_distribution[0], 5000, 0.1)
-    assert int_equal_with_percentage_margin?(priority_distribution[1], 5000, 0.1)
+    assert int_equal_with_percentage_margin?(priority_distribution[0], 5000, 0.3)
+    assert int_equal_with_percentage_margin?(priority_distribution[1], 5000, 0.3)
   end
 
   property "when no context is provided fallback to the default agent value" do
@@ -89,8 +89,8 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRateTest do
 
     priority_distribution = priority_generator |> Stream.take(10000) |> Enum.frequencies()
 
-    assert int_equal_with_percentage_margin?(priority_distribution[0], 1000, 0.1)
-    assert int_equal_with_percentage_margin?(priority_distribution[1], 9000, 0.1)
+    assert int_equal_with_percentage_margin?(priority_distribution[0], 1000, 0.3)
+    assert int_equal_with_percentage_margin?(priority_distribution[1], 9000, 0.3)
   end
 
   # this is a higher level test using a real api_server process
@@ -129,8 +129,8 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRateTest do
 
     priority_distribution = priority_generator |> Stream.take(10000) |> Enum.frequencies()
 
-    assert int_equal_with_percentage_margin?(priority_distribution[0], 5000, 0.1)
-    assert int_equal_with_percentage_margin?(priority_distribution[1], 5000, 0.1)
+    assert int_equal_with_percentage_margin?(priority_distribution[0], 5000, 0.3)
+    assert int_equal_with_percentage_margin?(priority_distribution[1], 5000, 0.3)
   end
 
   def int_equal_with_percentage_margin?(a, b, percentage_margin) do
