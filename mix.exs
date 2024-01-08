@@ -54,7 +54,7 @@ defmodule SpandexDatadog.MixProject do
     [
       {:msgpax, "~> 2.2.1 or ~> 2.3"},
       {:jason, "~> 1.2"},
-      {:spandex, "4.1.0-pre.1", hex: :spandex_fresha, organization: "fresha"},
+      {:spandex, "4.1.0-pre.2", hex: :spandex_fresha, organization: "fresha"},
       {:telemetry, "~> 0.4.2 or ~> 1.0"},
       # Dev- and test-only deps
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
