@@ -271,16 +271,18 @@ defmodule SpandexDatadog.ApiServer do
           "_dd.p.dm" =>
             case sampling[:sampling_mechanism_used] do
               nil -> nil
-              mechanism -> to_string(mechanism)
+              mechanism -> "-#{to_string(mechanism)}"
             end,
           env: span.env,
           version: span.service_version
         }
         |> add_analytics_sample_rate(span)
         |> add_tags(span),
-      metrics: %{
-        "_sampling_priority_v1" => sampling[:priority]
-      } |> Map.merge(sampling_rate_used_params(sampling))
+      metrics:
+        %{
+          "_sampling_priority_v1" => sampling[:priority]
+        }
+        |> Map.merge(sampling_rate_used_params(sampling))
     }
   end
 
