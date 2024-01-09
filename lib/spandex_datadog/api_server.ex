@@ -279,7 +279,7 @@ defmodule SpandexDatadog.ApiServer do
         |> add_analytics_sample_rate(span)
         |> add_tags(span),
       metrics: %{
-        _sampling_priority_v1: sampling[:priority]
+        "_sampling_priority_v1" => sampling[:priority]
       } |> Map.merge(sampling_rate_used_params(sampling))
     }
   end
