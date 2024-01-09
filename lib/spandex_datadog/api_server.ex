@@ -279,9 +279,8 @@ defmodule SpandexDatadog.ApiServer do
         |> add_analytics_sample_rate(span)
         |> add_tags(span),
       metrics: %{
-        "_dd.agent_psr" => sampling[:sampling_rate_used],
         _sampling_priority_v1: sampling[:priority]
-      }
+      } |> Map.merge(psr(sampling))
     }
   end
 
@@ -411,4 +410,16 @@ defmodule SpandexDatadog.ApiServer do
   defp term_to_string(term) when is_binary(term), do: term
   defp term_to_string(term) when is_atom(term), do: term
   defp term_to_string(term), do: inspect(term)
+
+  # in datadog the priority_sampling_rate metric should be sent using different keys
+  # for different sampling mechanisms
+  defp psr(sampling) do
+    if sampling_mechanism_used == SpandexDatadog.DatadogConstants.sampling_mechanism_used()[:RULE] do
+        %{"_dd.rule_psr" => sampling[:sampling_rate_used]}
+    else if sampling_mechanism_used == SpandexDatadog.DatadogConstants.sampling_mechanism_used()[:AGENT]
+        %{"_dd.agent_psr" => sampling[:sampling_rate_used]}
+    else
+      %{}
+    end
+  end
 end
