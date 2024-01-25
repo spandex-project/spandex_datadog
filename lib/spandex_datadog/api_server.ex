@@ -203,7 +203,7 @@ defmodule SpandexDatadog.ApiServer do
         Map.put(agent_state, :sampling_rates, body["rate_by_service"])
       end)
     else
-      _ -> Logger.warning(fn -> "Failed to send traces and update the sampling rates: #{inspect(response)}" end)
+      _ -> Logger.error(fn -> "Failed to send traces and update the sampling rates: #{inspect(response)}" end)
     end
 
     if verbose? do
