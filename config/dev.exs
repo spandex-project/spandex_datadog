@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 config :git_ops,
   mix_project: SpandexDatadog.MixProject,
