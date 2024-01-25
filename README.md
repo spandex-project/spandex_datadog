@@ -35,8 +35,7 @@ spandex_opts =
     host: System.get_env("DATADOG_HOST") || "localhost",
     port: System.get_env("DATADOG_PORT") || 8126,
     batch_size: System.get_env("SPANDEX_BATCH_SIZE") || 10,
-    sync_threshold: System.get_env("SPANDEX_SYNC_THRESHOLD") || 100,
-    http: HTTPoison
+    sync_threshold: System.get_env("SPANDEX_SYNC_THRESHOLD") || 100
   ]
 
 children = [

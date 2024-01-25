@@ -5,6 +5,7 @@ defmodule SpandexDatadog.ApiServerMoxTest do
 
   alias Spandex.Trace
   alias SpandexDatadog.ApiServer
+  alias SpandexDatadog.MockAgentHttpClient
 
   # Make sure mocks are verified when the test exits
   setup :verify_on_exit!
@@ -17,7 +18,6 @@ defmodule SpandexDatadog.ApiServerMoxTest do
     # start our ApiServer GenServer
     opts = [
       name: __MODULE__,
-      http: HTTPoisonMock,
       batch_size: 5
     ]
 
@@ -34,10 +34,12 @@ defmodule SpandexDatadog.ApiServerMoxTest do
     end)
 
     # expect a put request to send the traces out
-    HTTPoisonMock
-    |> expect(:put, fn "localhost:8126/v0.4/traces", _body, _options ->
+    MockAgentHttpClient
+    |> expect(:send_traces, fn %{host: "localhost", port: 8126, body: body, headers: headers} ->
+      assert body
+      assert headers
       send(test_pid, :http_put_finished)
-      {:ok, %HTTPoison.Response{}}
+      {:ok, %Req.Response{status: 200, body: %{}}}
     end)
 
     # put the final trace that should trigger us to send the traces out
@@ -50,7 +52,6 @@ defmodule SpandexDatadog.ApiServerMoxTest do
     # start our ApiServer GenServer
     opts = [
       name: __MODULE__,
-      http: HTTPoisonMock,
       batch_size: 10
     ]
 
@@ -64,10 +65,12 @@ defmodule SpandexDatadog.ApiServerMoxTest do
     assert :ok = GenServer.call(server, {:send_trace, trace})
 
     # shut our ApiServer down and expect a final http_put to flush any traces left in the batch
-    HTTPoisonMock
-    |> expect(:put, fn "localhost:8126/v0.4/traces", _body, _options ->
+    MockAgentHttpClient
+    |> expect(:send_traces, fn %{host: "localhost", port: 8126, body: body, headers: headers} ->
+      assert body
+      assert headers
       send(test_pid, :http_put_finished)
-      {:ok, %HTTPoison.Response{}}
+      {:ok, %Req.Response{status: 200, body: %{}}}
     end)
 
     assert :ok = GenServer.stop(server)
@@ -78,7 +81,6 @@ defmodule SpandexDatadog.ApiServerMoxTest do
     # start our ApiServer GenServer
     opts = [
       name: __MODULE__,
-      http: HTTPoisonMock,
       trap_exits?: true,
       batch_size: 10
     ]
@@ -96,10 +98,12 @@ defmodule SpandexDatadog.ApiServerMoxTest do
     assert :ok = GenServer.call(server, {:send_trace, trace})
 
     # shut our ApiServer down and expect a final http_put to flush any traces left in the batch
-    HTTPoisonMock
-    |> expect(:put, fn "localhost:8126/v0.4/traces", _body, _options ->
+    MockAgentHttpClient
+    |> expect(:send_traces, fn %{host: "localhost", port: 8126, body: body, headers: headers} ->
+      assert body
+      assert headers
       send(test_pid, :http_put_finished)
-      {:ok, %HTTPoison.Response{}}
+      {:ok, %Req.Response{status: 200, body: %{}}}
     end)
 
     assert Process.exit(server, :shutdown)
@@ -110,7 +114,6 @@ defmodule SpandexDatadog.ApiServerMoxTest do
     # start our ApiServer GenServer
     opts = [
       name: __MODULE__,
-      http: HTTPoisonMock,
       batch_size: 10
     ]
 
@@ -126,11 +129,13 @@ defmodule SpandexDatadog.ApiServerMoxTest do
     trace = %Trace{id: "123"}
     assert :ok = GenServer.call(server, {:send_trace, trace})
 
-    # shut our ApiServer down and stup http put for testing
-    HTTPoisonMock
-    |> stub(:put, fn "localhost:8126/v0.4/traces", _body, _options ->
+    # shut our ApiServer down and setup http put for testing
+    MockAgentHttpClient
+    |> stub(:send_traces, fn %{host: "localhost", port: 8126, body: body, headers: headers} ->
+      assert body
+      assert headers
       send(test_pid, :http_put_finished)
-      {:ok, %HTTPoison.Response{}}
+      {:ok, %Req.Response{status: 200, body: %{}}}
     end)
 
     assert Process.exit(server, :shutdown)

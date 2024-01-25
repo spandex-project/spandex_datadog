@@ -11,6 +11,8 @@ defmodule SpandexDatadog.ApiServer do
     Trace
   }
 
+  alias SpandexDatadog.AgentHttpClient
+
   defmodule State do
     @moduledoc false
 
@@ -18,7 +20,6 @@ defmodule SpandexDatadog.ApiServer do
 
     defstruct [
       :asynchronous_send?,
-      :http,
       :url,
       :host,
       :port,
@@ -32,7 +33,7 @@ defmodule SpandexDatadog.ApiServer do
     ]
   end
 
-  # Same as HTTPoison.headers
+  # Same as Req.headers
   @type headers :: [{atom, binary}] | [{binary, binary}] | %{binary => binary} | any
 
   @headers [
@@ -44,7 +45,6 @@ defmodule SpandexDatadog.ApiServer do
 
   @default_opts [
     host: "localhost",
-    http: HTTPoison,
     port: 8126,
     verbose?: false,
     batch_size: 10,
@@ -60,7 +60,6 @@ defmodule SpandexDatadog.ApiServer do
 
   ## Options
 
-  * `:http` - The HTTP module to use for sending spans to the agent. Defaults to `HTTPoison`.
   * `:host` - The host the agent can be reached at. Defaults to `"localhost"`.
   * `:port` - The port to use when sending traces to the agent. Defaults to `8126`.
   * `:verbose?` - Only to be used for debugging: All finished traces will be logged. Defaults to `false`
@@ -96,7 +95,6 @@ defmodule SpandexDatadog.ApiServer do
       host: opts[:host],
       port: opts[:port],
       verbose?: opts[:verbose?],
-      http: opts[:http],
       waiting_traces: [],
       batch_size: opts[:batch_size],
       sync_threshold: opts[:sync_threshold],
@@ -200,10 +198,9 @@ defmodule SpandexDatadog.ApiServer do
       |> encode()
       |> push(headers, state)
 
-    with {:ok, %{status_code: 200, body: body}} <- response,
-         {:ok, sampling_rates} <- Jason.decode(body) do
+    with {:ok, %{status: 200, body: body}} <- response do
       Agent.update(state.agent_pid, fn agent_state ->
-        Map.put(agent_state, :sampling_rates, sampling_rates["rate_by_service"])
+        Map.put(agent_state, :sampling_rates, body["rate_by_service"])
       end)
     else
       _ -> Logger.warning(fn -> "Failed to send traces and update the sampling rates: #{inspect(response)}" end)
@@ -398,8 +395,9 @@ defmodule SpandexDatadog.ApiServer do
     do: data |> deep_remove_nils() |> Msgpax.pack!(data)
 
   @spec push(body :: iodata(), headers, State.t()) :: any()
-  defp push(body, headers, %State{http: http, host: host, port: port}),
-    do: http.put("#{host}:#{port}/v0.4/traces", body, headers)
+  defp push(body, headers, %State{host: host, port: port}) do
+    AgentHttpClient.send_traces(%{host: host, port: port, body: body, headers: headers})
+  end
 
   @spec deep_remove_nils(term) :: term
   defp deep_remove_nils(term) when is_map(term) do

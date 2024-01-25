@@ -2,14 +2,14 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRateTest do
   use ExUnit.Case
   use ExUnitProperties
 
+  import Mox
+
   alias SpandexDatadog.DatadogConstants
+  alias SpandexDatadog.MockAgentHttpClient
   alias SpandexDatadog.SamplingStrategies.UseAgentSamplingRate
 
-  defmodule TestOkApiServerAsync do
-    def put(_url, _body, _headers) do
-      {:ok, %HTTPoison.Response{status_code: 200, body: Jason.encode!(%{rate_by_service: %{"service:,env:": 0.5}})}}
-    end
-  end
+  setup :verify_on_exit!
+  setup :set_mox_global
 
   defmodule ApiServerWithoutSamplingRates do
     def get_sampling_rates() do
@@ -95,8 +95,14 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRateTest do
 
   # this is a higher level test using a real api_server process
   property "uses sampling rates given by the datadog agent" do
+    MockAgentHttpClient
+    |> expect(:send_traces, fn %{host: "localhost", port: 8126, body: body, headers: headers} ->
+      assert body
+      assert headers
+      {:ok, %{status: 200, body: %{"rate_by_service" => %{"service:,env:" => 0.5}}}}
+    end)
+
     SpandexDatadog.ApiServer.start_link(
-      http: TestOkApiServerAsync,
       batch_size: 1,
       asynchronous_send?: false
     )

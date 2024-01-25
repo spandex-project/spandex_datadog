@@ -1,3 +1,4 @@
 ExUnit.start()
 
-Mox.defmock(HTTPoisonMock, for: HTTPoison.Base)
+Mox.defmock(SpandexDatadog.MockAgentHttpClient, for: SpandexDatadog.AgentHttpClient)
+Application.put_env(:spandex_datadog, :agent_http_client, SpandexDatadog.MockAgentHttpClient)

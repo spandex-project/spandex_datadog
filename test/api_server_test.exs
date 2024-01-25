@@ -2,6 +2,7 @@ defmodule SpandexDatadog.ApiServerTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
+  import Mox
 
   alias Spandex.{
     Span,
@@ -10,33 +11,10 @@ defmodule SpandexDatadog.ApiServerTest do
 
   alias SpandexDatadog.ApiServer
   alias SpandexDatadog.DatadogConstants
+  alias SpandexDatadog.MockAgentHttpClient
 
-  defmodule TestOkApiServer do
-    def put(url, body, headers) do
-      send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
-      {:ok, %HTTPoison.Response{status_code: 200, body: Jason.encode!(%{rate_by_service: %{"service:env:": 0.5}})}}
-    end
-  end
-
-  defmodule TestOkApiServerAsync do
-    def put(_url, _body, _headers) do
-      {:ok, %HTTPoison.Response{status_code: 200, body: Jason.encode!(%{rate_by_service: %{"service:env:": 0.5}})}}
-    end
-  end
-
-  defmodule TestErrorApiServer do
-    def put(url, body, headers) do
-      send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), url, headers})
-      {:error, %HTTPoison.Error{id: :foo, reason: :bar}}
-    end
-  end
-
-  defmodule TestSlowApiServer do
-    def put(_url, _body, _headers) do
-      Process.sleep(500)
-      {:error, :timeout}
-    end
-  end
+  setup :verify_on_exit!
+  setup :set_mox_global
 
   defmodule TelemetryRecorderPDict do
     def handle_event(event, measurements, metadata, _cfg) do
@@ -105,11 +83,12 @@ defmodule SpandexDatadog.ApiServerTest do
       [
         trace: trace,
         url: "localhost:8126/v0.4/traces",
+        body: "body",
+        headers: "headers",
         state: %ApiServer.State{
           asynchronous_send?: false,
           host: "localhost",
-          port: "8126",
-          http: TestOkApiServer,
+          port: 8126,
           verbose?: false,
           waiting_traces: [],
           batch_size: 1,
@@ -132,7 +111,7 @@ defmodule SpandexDatadog.ApiServerTest do
         nil
       )
 
-      assert {:ok, _pid} = ApiServer.start_link(http: TestOkApiServer, name: __MODULE__)
+      assert {:ok, _pid} = ApiServer.start_link(name: __MODULE__)
 
       ApiServer.send_trace(trace, name: __MODULE__)
 
@@ -159,7 +138,7 @@ defmodule SpandexDatadog.ApiServerTest do
         nil
       )
 
-      ApiServer.start_link(http: TestSlowApiServer, batch_size: 0, sync_threshold: 0)
+      ApiServer.start_link(batch_size: 0, sync_threshold: 0)
 
       catch_exit(ApiServer.send_trace(trace, timeout: 1))
 
@@ -179,7 +158,15 @@ defmodule SpandexDatadog.ApiServerTest do
   end
 
   describe "ApiServer.handle_call/3 - :send_trace" do
-    test "doesn't log anything when verbose?: false", %{trace: trace, state: state, url: url} do
+    test "doesn't log anything when verbose?: false", %{trace: trace, state: state} do
+      MockAgentHttpClient
+      |> expect(:send_traces, fn %{host: host, port: port, body: body, headers: headers} ->
+        send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), host, port, headers})
+        assert body
+        assert headers
+        {:ok, %{status: 200, body: %{"rate_by_service" => %{"service:env:" => 0.5}}}}
+      end)
+
       log =
         capture_log(fn ->
           ApiServer.handle_call({:send_trace, trace}, self(), state)
@@ -260,18 +247,26 @@ defmodule SpandexDatadog.ApiServerTest do
         {"X-Datadog-Trace-Count", 1}
       ]
 
-      assert_received {:put_datadog_spans, ^formatted, ^url, ^headers}
+      host = state.host
+      port = state.port
+      assert_received {:put_datadog_spans, ^formatted, ^host, ^port, ^headers}
     end
 
     test "warns about errors in the response because it's used to update sampling rates", %{
       trace: trace,
-      state: state,
-      url: url
+      state: state
     } do
+      MockAgentHttpClient
+      |> expect(:send_traces, fn %{host: host, port: port, body: body, headers: headers} ->
+        assert body
+        assert headers
+        send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), host, port, headers})
+        {:error, %{id: :foo, reason: :bar}}
+      end)
+
       state =
         state
         |> Map.put(:verbose?, true)
-        |> Map.put(:http, TestErrorApiServer)
 
       [enqueue, processing, received_spans, failure_log, response] =
         capture_log(fn ->
@@ -353,14 +348,23 @@ defmodule SpandexDatadog.ApiServerTest do
         }
       ]
 
-      assert response =~ ~r/Trace response: {:error, %HTTPoison.Error{id: :foo, reason: :bar}}/ ||
-               response =~ ~r/Trace response: {:error, %HTTPoison.Error{reason: :bar, id: :foo}}/
+      assert response =~ ~r/Trace response: {:error, %{id: :foo, reason: :bar}}/ ||
+               response =~ ~r/Trace response: {:error, %{reason: :bar, id: :foo}}/
 
-      assert_received {:put_datadog_spans, ^formatted, ^url, _}
+      host = state.host
+      port = state.port
+      assert_received {:put_datadog_spans, ^formatted, ^host, ^port, _}
     end
 
     test "sending the traces stores the sampling rates that can then be fetched", %{trace: trace} do
-      ApiServer.start_link(http: TestOkApiServerAsync, batch_size: 1, asynchronous_send?: false)
+      MockAgentHttpClient
+      |> expect(:send_traces, fn %{host: "localhost", port: 8126, body: body, headers: headers} ->
+        assert body
+        assert headers
+        {:ok, %{status: 200, body: %{"rate_by_service" => %{"service:env:" => 0.5}}}}
+      end)
+
+      ApiServer.start_link(batch_size: 1, asynchronous_send?: false)
 
       :ok = ApiServer.send_trace(trace)
 

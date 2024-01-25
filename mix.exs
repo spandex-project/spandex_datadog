@@ -53,12 +53,11 @@ defmodule SpandexDatadog.MixProject do
   defp deps do
     [
       {:msgpax, "~> 2.2.1 or ~> 2.3"},
-      {:jason, "~> 1.2"},
       {:spandex, "~> 4.1", hex: :spandex_fresha, organization: "fresha"},
       {:telemetry, "~> 0.4.2 or ~> 1.0"},
       # Dev- and test-only deps
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:httpoison, "~> 0.13 or ~> 1.0 or ~> 2.0", only: :test},
+      {:req, "~> 0.4.0"},
       {:mox, "~> 1.0", only: :test},
       {:stream_data, "~> 0.5", only: :test}
     ]
