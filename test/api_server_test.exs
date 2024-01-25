@@ -159,22 +159,7 @@ defmodule SpandexDatadog.ApiServerTest do
 
   describe "ApiServer.handle_call/3 - :send_trace" do
     test "doesn't log anything when verbose?: false", %{trace: trace, state: state} do
-      MockAgentHttpClient
-      |> expect(:send_traces, fn %{host: host, port: port, body: body, headers: headers} ->
-        send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), host, port, headers})
-        assert body
-        assert headers
-        {:ok, %{status: 200, body: %{"rate_by_service" => %{"service:env:" => 0.5}}}}
-      end)
-
-      log =
-        capture_log(fn ->
-          ApiServer.handle_call({:send_trace, trace}, self(), state)
-        end)
-
-      assert log == ""
-
-      formatted = [
+      expected_formatted_body = [
         %{
           "duration" => 100_000,
           "error" => 0,
@@ -239,7 +224,7 @@ defmodule SpandexDatadog.ApiServerTest do
         }
       ]
 
-      headers = [
+      expected_headers = [
         {"Content-Type", "application/msgpack"},
         {"Datadog-Meta-Lang", "elixir"},
         {"Datadog-Meta-Lang-Version", System.version()},
@@ -247,43 +232,29 @@ defmodule SpandexDatadog.ApiServerTest do
         {"X-Datadog-Trace-Count", 1}
       ]
 
-      host = state.host
-      port = state.port
-      assert_received {:put_datadog_spans, ^formatted, ^host, ^port, ^headers}
+      MockAgentHttpClient
+      |> expect(:send_traces, fn %{host: host, port: port, body: body, headers: headers} ->
+        formatted_body = body |> Msgpax.unpack!() |> hd()
+        assert formatted_body == expected_formatted_body
+        assert headers == expected_headers
+        assert host == state.host
+        assert port == state.port
+        {:ok, %Req.Response{status: 200, body: %{"rate_by_service" => %{"service:,env:" => 0.5}}}}
+      end)
+
+      log =
+        capture_log(fn ->
+          ApiServer.handle_call({:send_trace, trace}, self(), state)
+        end)
+
+      assert log == ""
     end
 
     test "warns about errors in the response because it's used to update sampling rates", %{
       trace: trace,
       state: state
     } do
-      MockAgentHttpClient
-      |> expect(:send_traces, fn %{host: host, port: port, body: body, headers: headers} ->
-        assert body
-        assert headers
-        send(self(), {:put_datadog_spans, body |> Msgpax.unpack!() |> hd(), host, port, headers})
-        {:error, %{id: :foo, reason: :bar}}
-      end)
-
-      state =
-        state
-        |> Map.put(:verbose?, true)
-
-      [enqueue, processing, received_spans, failure_log, response] =
-        capture_log(fn ->
-          {:reply, :ok, _} = ApiServer.handle_call({:send_trace, trace}, self(), state)
-        end)
-        |> String.split("\n")
-        |> Enum.reject(fn s -> s == "" end)
-
-      assert enqueue =~ ~r/Adding trace to stack with 3 spans/
-
-      assert processing =~ ~r/Sending 1 traces, 3 spans/
-
-      assert received_spans =~ ~r/Trace: \[%Spandex.Trace{/
-
-      assert failure_log =~ ~r/Failed to send traces and update the sampling rates/
-
-      formatted = [
+      expected_formatted_body = [
         %{
           "duration" => 100_000,
           "error" => 0,
@@ -348,12 +319,36 @@ defmodule SpandexDatadog.ApiServerTest do
         }
       ]
 
+      MockAgentHttpClient
+      |> expect(:send_traces, fn %{host: host, port: port, body: body, headers: _headers} ->
+        formatted_body = body |> Msgpax.unpack!() |> hd()
+        assert formatted_body == expected_formatted_body
+        assert host == state.host
+        assert port == state.port
+        {:error, %{id: :foo, reason: :bar}}
+      end)
+
+      state =
+        state
+        |> Map.put(:verbose?, true)
+
+      [enqueue, processing, received_spans, failure_log, response] =
+        capture_log(fn ->
+          {:reply, :ok, _} = ApiServer.handle_call({:send_trace, trace}, self(), state)
+        end)
+        |> String.split("\n")
+        |> Enum.reject(fn s -> s == "" end)
+
+      assert enqueue =~ ~r/Adding trace to stack with 3 spans/
+
+      assert processing =~ ~r/Sending 1 traces, 3 spans/
+
+      assert received_spans =~ ~r/Trace: \[%Spandex.Trace{/
+
+      assert failure_log =~ ~r/Failed to send traces and update the sampling rates/
+
       assert response =~ ~r/Trace response: {:error, %{id: :foo, reason: :bar}}/ ||
                response =~ ~r/Trace response: {:error, %{reason: :bar, id: :foo}}/
-
-      host = state.host
-      port = state.port
-      assert_received {:put_datadog_spans, ^formatted, ^host, ^port, _}
     end
 
     test "sending the traces stores the sampling rates that can then be fetched", %{trace: trace} do
@@ -361,7 +356,7 @@ defmodule SpandexDatadog.ApiServerTest do
       |> expect(:send_traces, fn %{host: "localhost", port: 8126, body: body, headers: headers} ->
         assert body
         assert headers
-        {:ok, %{status: 200, body: %{"rate_by_service" => %{"service:env:" => 0.5}}}}
+        {:ok, %Req.Response{status: 200, body: %{"rate_by_service" => %{"service:,env:" => 0.5}}}}
       end)
 
       ApiServer.start_link(batch_size: 1, asynchronous_send?: false)
@@ -370,7 +365,7 @@ defmodule SpandexDatadog.ApiServerTest do
 
       sampling_rates = ApiServer.get_sampling_rates()
 
-      assert sampling_rates == %{"service:env:" => 0.5}
+      assert sampling_rates == %{"service:,env:" => 0.5}
     end
   end
 end
