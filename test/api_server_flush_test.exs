@@ -1,4 +1,4 @@
-defmodule SpandexDatadog.ApiServerMoxTest do
+defmodule SpandexDatadog.ApiServerFlushTest do
   use ExUnit.Case
 
   import Mox
