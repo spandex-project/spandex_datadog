@@ -2,7 +2,7 @@ defmodule SpandexDatadog.ApiServerTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
-  import Mox
+  import Hammox
 
   alias Spandex.{
     Span,

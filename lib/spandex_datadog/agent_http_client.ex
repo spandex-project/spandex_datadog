@@ -1,6 +1,6 @@
 defmodule SpandexDatadog.AgentHttpClient do
   @callback send_traces(%{host: String.t(), port: integer(), body: iodata(), headers: list()}) ::
-              {:ok, %{status: integer(), body: map()}} | {:error, any()}
+              {:ok, %Req.Response{status: integer(), body: map()}} | {:error, any()}
 
   def send_traces(%{host: host, port: port, body: body, headers: headers}),
     do: impl().send_traces(%{host: host, port: port, body: body, headers: headers})

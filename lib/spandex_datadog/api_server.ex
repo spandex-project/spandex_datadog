@@ -394,7 +394,7 @@ defmodule SpandexDatadog.ApiServer do
   defp encode(data),
     do: data |> deep_remove_nils() |> Msgpax.pack!(data)
 
-  @spec push(body :: iodata(), headers, State.t()) :: any()
+  @spec push(body :: iodata(), headers, State.t()) :: {:ok, any()} | {:error, any()}
   defp push(body, headers, %State{host: host, port: port}) do
     AgentHttpClient.send_traces(%{host: host, port: port, body: body, headers: headers})
   end

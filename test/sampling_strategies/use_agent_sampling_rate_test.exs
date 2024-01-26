@@ -2,7 +2,7 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRateTest do
   use ExUnit.Case
   use ExUnitProperties
 
-  import Mox
+  import Hammox
 
   alias SpandexDatadog.DatadogConstants
   alias SpandexDatadog.MockAgentHttpClient
@@ -99,7 +99,7 @@ defmodule SpandexDatadog.SamplingStrategies.UseAgentSamplingRateTest do
     |> expect(:send_traces, fn %{host: "localhost", port: 8126, body: body, headers: headers} ->
       assert body
       assert headers
-      {:ok, %{status: 200, body: %{"rate_by_service" => %{"service:,env:" => 0.5}}}}
+      {:ok, %Req.Response{status: 200, body: %{"rate_by_service" => %{"service:,env:" => 0.5}}}}
     end)
 
     SpandexDatadog.ApiServer.start_link(

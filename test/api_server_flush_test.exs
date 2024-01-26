@@ -1,7 +1,7 @@
 defmodule SpandexDatadog.ApiServerFlushTest do
   use ExUnit.Case
 
-  import Mox
+  import Hammox
 
   alias Spandex.Trace
   alias SpandexDatadog.ApiServer

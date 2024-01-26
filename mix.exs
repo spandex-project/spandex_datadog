@@ -58,7 +58,7 @@ defmodule SpandexDatadog.MixProject do
       # Dev- and test-only deps
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:req, "~> 0.4.0"},
-      {:mox, "~> 1.0", only: :test},
+      {:hammox, "~> 0.7", only: :test},
       {:stream_data, "~> 0.5", only: :test}
     ]
   end

@@ -3,7 +3,7 @@
 ## [1.6.1](https://github.com/surgeventures/spandex_datadog/compare/v1.6.0...v1.6.1) (2024-01-25)
 
 ## Bug Fixes
-* Req (with handling retries) as a HTTP client by @Artur-Sulej in https://github.com/surgeventures/spandex_datadog/pull/2
+* Req (with handling retries) as a HTTP client by @Artur-Sulej in https://github.com/surgeventures/spandex_datadog/pull/9
 
 ## [1.6.0](https://github.com/surgeventures/spandex_datadog/compare/v1.5.0...v1.6.0) (2024-01-09)
 
