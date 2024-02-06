@@ -345,10 +345,27 @@ defmodule SpandexDatadog.ApiServerTest do
 
       assert received_spans =~ ~r/Trace: \[%Spandex.Trace{/
 
-      assert failure_log =~ ~r/Failed to send traces and update the sampling rates/
+      assert failure_log =~ ~r/non-200 response when sending traces:/
 
       assert response =~ ~r/Trace response: {:error, %{id: :foo, reason: :bar}}/ ||
                response =~ ~r/Trace response: {:error, %{reason: :bar, id: :foo}}/
+    end
+
+    test "survives exception when handling response", %{trace: trace} do
+      MockAgentHttpClient
+      |> Mox.expect(:send_traces, fn %{host: "localhost", port: 8126, body: _body, headers: _headers} ->
+        {:ok, %Req.Response{status: 200, body: "i am not what you expected"}}
+      end)
+
+      ApiServer.start_link(batch_size: 1, asynchronous_send?: false)
+
+      log =
+        capture_log(fn ->
+          :ok = ApiServer.send_trace(trace)
+        end)
+
+      assert log =~ ~r/Failed to update the sampling rates/
+      assert ApiServer.get_sampling_rates() == nil
     end
 
     test "sending the traces stores the sampling rates that can then be fetched", %{trace: trace} do

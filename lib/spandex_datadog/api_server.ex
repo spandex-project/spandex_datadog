@@ -198,12 +198,20 @@ defmodule SpandexDatadog.ApiServer do
       |> encode()
       |> push(headers, state)
 
-    with {:ok, %{status: 200, body: body}} <- response do
-      Agent.update(state.agent_pid, fn agent_state ->
-        Map.put(agent_state, :sampling_rates, body["rate_by_service"])
-      end)
-    else
-      _ -> Logger.error(fn -> "Failed to send traces and update the sampling rates: #{inspect(response)}" end)
+    try do
+      case response do
+        {:ok, %{status: 200, body: body}} ->
+          rates = body["rate_by_service"]
+
+          Agent.update(state.agent_pid, fn agent_state ->
+            Map.put(agent_state, :sampling_rates, rates)
+          end)
+
+        resp ->
+          Logger.error(fn -> "non-200 response when sending traces: #{inspect(resp)}" end)
+      end
+    rescue
+      e -> Logger.error(fn -> "Failed to update the sampling rates: #{inspect(e)}" end)
     end
 
     if verbose? do
